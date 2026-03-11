@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
 
 const PROTECTED_ROUTES = ["/settings"]
 
@@ -19,51 +19,31 @@ export const updateSession = async (request: NextRequest) => {
           get(name: string) {
             return request.cookies.get(name)?.value
           },
-          set(name: string, value: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value,
-              ...options,
-            })
+          set(name: string, value: string, options: any) {
+            request.cookies.set({ name, value, ...options })
             response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
+              request: { headers: request.headers },
             })
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            })
+            response.cookies.set({ name, value, ...options })
           },
-          remove(name: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value: "",
-              ...options,
-            })
+          remove(name: string, options: any) {
+            request.cookies.set({ name, value: "", ...options })
             response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
+              request: { headers: request.headers },
             })
-            response.cookies.set({
-              name,
-              value: "",
-              ...options,
-            })
+            response.cookies.set({ name, value: "", ...options })
           },
         },
       }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase.auth.getSession()
 
     const isProtected = PROTECTED_ROUTES.some((route) =>
       request.nextUrl.pathname.startsWith(route)
     )
 
-    if (isProtected && !user) {
+    if (isProtected && !data.session) {
       const loginUrl = new URL("/login", request.url)
       loginUrl.searchParams.set("message", "Please sign in to continue")
       return NextResponse.redirect(loginUrl)
