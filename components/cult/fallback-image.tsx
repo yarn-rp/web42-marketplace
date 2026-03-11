@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import Image, { ImageProps } from "next/image"
-import placeholderImg from "@/assets/placeholder.png"
 
 interface ImageWithFallbackProps extends Omit<ImageProps, "src"> {
   fallback?: string
@@ -10,7 +9,7 @@ interface ImageWithFallbackProps extends Omit<ImageProps, "src"> {
 }
 
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
-  fallback = placeholderImg,
+  fallback = "",
   alt,
   src,
   ...props
@@ -20,6 +19,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   useEffect(() => {
     setError(false)
   }, [src])
+
+  if (error && !fallback) {
+    return null
+  }
 
   return (
     <Image

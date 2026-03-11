@@ -1,57 +1,65 @@
 import "./globals.css"
 import { ReactNode } from "react"
-import localFont from "next/font/local"
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google"
 
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { TopNav } from "@/components/top-nav"
 
 import { ThemeProvider } from "./providers"
+import { getCurrentProfile } from "./actions/profile"
 
-export const fontSans = localFont({
-  src: "../fonts/haskoy.ttf",
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
   variable: "--font-sans",
 })
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://www.nextjs.design`
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+})
+
+const defaultUrl = process.env.NEXT_PUBLIC_SITE_URL
+  ? process.env.NEXT_PUBLIC_SITE_URL
   : "http://localhost:3000"
 
 export const metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Design x Engineering Directory - Discover Top Web Dev Tools",
+  title: "Web42 Agent Marketplace",
   description:
-    "Explore a curated directory of free web development tools for designers and engineers. Find resources for JavaScript, Tailwind CSS, and more!",
+    "Discover, remix, and install agent packages. Share your exact agent setup so others can have exactly what you have.",
   keywords:
-    "Design, Engineering, Web Development, JavaScript, Tailwind CSS, Supabase, Free Tools, Design Engineering",
-  structuredData: {
-    "@context": "http://schema.org",
-    "@type": "WebSite",
-    name: "Design x Engineering Directory",
-    url: "https://www.nextjs.design/",
-    description:
-      "A free directory of awesome web development tools for design and engineering professionals.",
+    "AI Agents, Agent Marketplace, CLI, Web42, Agent Packages",
+  icons: {
+    icon: "/icon.svg",
   },
-  socialMediaTags: {
-    "og:title": "Design x Engineering Directory - Discover Top Web Dev Tools",
-    "og:description":
-      "Explore a curated directory of free web development tools for designers and engineers. Find resources for JavaScript, Tailwind CSS, and more!",
-    "twitter:card": "summary_large_image",
+  openGraph: {
+    title: "Web42 Agent Marketplace",
+    description:
+      "Discover, remix, and install agent packages. Share your exact agent setup so others can have exactly what you have.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
   },
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const profile = await getCurrentProfile()
+
   return (
-    <html lang="en" className={`${fontSans.variable} font-sans  `}>
+    <html lang="en" className={`${plusJakarta.variable} ${jetbrainsMono.variable} font-sans`}>
       <body>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
           <TooltipProvider>
-            <main className="bg-[#FAFAFA] dark:bg-background  text-foreground flex flex-col justify-center items-center w-full pt-13">
-              <div className=" w-full ">{children}</div>
+            <TopNav profile={profile} />
+            <main className="bg-background text-foreground min-h-screen w-full">
+              {children}
             </main>
           </TooltipProvider>
           <Toaster richColors />

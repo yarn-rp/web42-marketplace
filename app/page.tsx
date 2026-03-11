@@ -1,73 +1,70 @@
-import { Suspense } from "react"
+import Link from "next/link"
+import { ArrowRight } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { FadeIn } from "@/components/cult/fade-in"
-import { DirectorySearch } from "@/components/directory-search"
-import { Hero } from "@/components/hero"
+import { AgentCard } from "@/components/agent-card"
+import { AgentSearch } from "@/components/agent-search"
+import { CategoryPill } from "@/components/category-pill"
+import { FeaturedCarousel } from "@/components/featured-carousel"
+import { getCachedCategories } from "./actions/filters"
+import { getFeaturedAgents } from "./actions/agent"
 
-import {
-  EmptyFeaturedGrid,
-  FeaturedGrid,
-  ResourceCardGrid,
-} from "../components/directory-card-grid"
-import { NavSidebar } from "../components/nav"
-import { getCachedFilters } from "./actions/cached_actions"
-import { getProducts } from "./actions/product"
-
-// Select the resources you want to feature.. AD SPACE?
-const FEATURED_IDS = [
-  // "3b741434-1bdb-4903-91e9-a7fa154a8fdf",
-  // "f8a5db00-c80e-4fe4-80a7-af9d79a03690",
-  // "ad4b9d2e-6461-4eed-afbf-86aa284000cc",
-  "",
-] // Replace 'id1', 'id2', 'id3' with actual IDs you want to feature
-
-async function Page({ searchParams }: { searchParams: { search?: string } }) {
-  let data = await getProducts(searchParams.search)
-  let filters = await getCachedFilters()
-  const filteredFeaturedData = data.filter((d: any) =>
-    FEATURED_IDS.includes(d.id)
-  )
+async function Page() {
+  const featured = await getFeaturedAgents()
+  const categories = await getCachedCategories()
 
   return (
-    <>
-      <NavSidebar
-        categories={filters.categories}
-        labels={filters.labels}
-        tags={filters.tags}
-      />
+    <div className="w-full">
+      <FadeIn>
+        {/* Hero */}
+        <section className="flex flex-col items-center px-6 pt-20 pb-16 text-center">
+          <Badge variant="outline" className="mb-6">
+            Agent Marketplace
+          </Badge>
+          <h1 className="mb-4 max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
+            Marketplace
+          </h1>
+          <p className="mb-10 max-w-lg text-sm text-muted-foreground md:text-base">
+            Discover, remix, and install agent packages from the community.
+          </p>
+          <div className="w-full max-w-md">
+            <AgentSearch />
+          </div>
+        </section>
 
-      <div className="max-w-full px-2 md:pl-4 md:pr-0 pt-2">
-        <FadeIn>
-          <ResourceCardGrid
-            sortedData={data}
-            filteredFeaturedData={filteredFeaturedData}
-          >
-            <div className="grid grid-cols-1  xl:grid-cols-6 lg:gap-16 pb-8 pt-8 relative">
-              <div className="col-span-1 md:col-span-2 z-10">
-                <Hero>
-                  <DirectorySearch />
-                </Hero>
-              </div>
-
-              <div className="col-span-1 md:col-span-4 mt-6 md:mt-0">
-                {filteredFeaturedData.length >= 1 ? (
-                  <Suspense fallback={<div>Loading...</div>}>
-                    <div className=" relative">
-                      <FeaturedGrid featuredData={filteredFeaturedData} />
-                    </div>
-                  </Suspense>
-                ) : (
-                  <div className="relative">
-                    <EmptyFeaturedGrid />
-                  </div>
-                )}
-              </div>
+        {/* Categories */}
+        {categories.length > 0 && (
+          <section className="mx-auto max-w-5xl px-6 pb-12">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {categories.map((cat) => (
+                <CategoryPill key={cat.id} category={cat} />
+              ))}
             </div>
-          </ResourceCardGrid>
-        </FadeIn>
-      </div>
-    </>
+          </section>
+        )}
+
+        <Separator className="mx-auto max-w-6xl" />
+
+        {/* Featured Carousel */}
+        {featured.length > 0 && (
+          <section className="mx-auto max-w-6xl px-6 py-12">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Featured</h2>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/explore">
+                  See All
+                  <ArrowRight className="ml-1 size-4" />
+                </Link>
+              </Button>
+            </div>
+            <FeaturedCarousel agents={featured} />
+          </section>
+        )}
+      </FadeIn>
+    </div>
   )
 }
 

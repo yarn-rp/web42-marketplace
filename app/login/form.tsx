@@ -1,155 +1,60 @@
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { createClient } from "@/db/supabase/server"
+"use client"
 
+import { useSearchParams } from "next/navigation"
+import { Github } from "lucide-react"
+import { createClient } from "@/db/supabase/client"
+
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-
-import { ResetPassword } from "./reset-password"
-import { SubmitButton } from "./submit-button"
 
 export function LoginForm() {
-  const signIn = async (formData: FormData) => {
-    "use server"
+  const searchParams = useSearchParams()
+  const cliCode = searchParams.get("cli_code")
 
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+  const handleGitHubLogin = async () => {
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) return redirect("/login?message=Could not authenticate user")
-    return redirect("/submit")
-  }
+    const callbackUrl = new URL("/auth/callback", window.location.origin)
+    if (cliCode) {
+      callbackUrl.searchParams.set("cli_code", cliCode)
+    }
 
-  const signUp = async (formData: FormData) => {
-    "use server"
-
-    const origin = headers().get("origin")
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
+    await supabase.auth.signInWithOAuth({
+      provider: "github",
       options: {
-        emailRedirectTo: `${origin}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
+        scopes: "read:user user:email",
       },
     })
-    if (error) return redirect("/login?message=Error signing up")
-    const { error: err } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (err) return redirect("/login?message=Could not authenticate user")
-    return redirect("/submit")
-  }
-
-  const handleResetPassword = async (formData: FormData) => {
-    "use server"
-
-    const origin = headers().get("origin")
-    const email = formData.get("email") as string
-    const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${origin}/auth/callback?next=/login/password`,
-    })
-    if (error) return redirect(`/login?message=${error.message}`)
-    return redirect("/login?message=Check email to reset password")
   }
 
   return (
-    <div className="w-full flex flex-col items-center justify-center gap-2  ">
-      <Tabs defaultValue="login">
-        <TabsList>
-          <TabsTrigger value="login">Login</TabsTrigger>
-          <TabsTrigger value="signup">Sign Up</TabsTrigger>
-        </TabsList>
-        <TabsContent value="login">
-          <Card className="mx-auto w-[20rem] md:w-[24rem]">
-            <CardHeader>
-              <CardTitle className="text-2xl">Login</CardTitle>
-              <CardDescription>
-                Enter your information below to login to your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input name="email" placeholder="you@example.com" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    type="password"
-                    required
-                    name="password"
-                    placeholder="••••••••"
-                  />
-                </div>
-
-                <SubmitButton
-                  formAction={signIn}
-                  className="button-secondary rounded-md px-4 py-2 text-foreground mb-2"
-                  pendingText="Signing In..."
-                >
-                  Login
-                </SubmitButton>
-              </form>
-            </CardContent>
-            <CardFooter>
-              <ResetPassword handleResetPassword={handleResetPassword} />
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        <TabsContent value="signup">
-          <Card className="mx-auto w-[20rem] md:w-[24rem]">
-            <CardHeader>
-              <CardTitle className="text-2xl">Sign Up</CardTitle>
-              <CardDescription>
-                Enter your information below to create an account
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* <form className="animate-in flex-1 flex flex-col w-full justify-center gap-2 text-foreground"> */}
-              <form className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input name="email" placeholder="you@example.com" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    type="password"
-                    required
-                    name="password"
-                    placeholder="••••••••"
-                  />
-                </div>
-
-                <SubmitButton
-                  formAction={signUp}
-                  className="button-secondary rounded-md px-4 py-2 text-foreground mb-2"
-                  pendingText="Signing Up..."
-                >
-                  Sign Up
-                </SubmitButton>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+    <div className="w-full flex flex-col items-center justify-center gap-2">
+      <Card className="mx-auto w-[20rem] md:w-[24rem]">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Sign in to Web42</CardTitle>
+          <CardDescription>
+            {cliCode
+              ? "Sign in to authorize the Web42 CLI"
+              : "Connect your GitHub account to publish and remix agent packages"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={handleGitHubLogin}
+            className="w-full"
+            size="lg"
+          >
+            <Github className="mr-2 size-5" />
+            Continue with GitHub
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

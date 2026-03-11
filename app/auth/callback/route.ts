@@ -19,16 +19,33 @@
 // }
 
 import { NextResponse } from "next/server"
-import { createClient } from "@/db/supabase/server"
+import { createClient as createServerClient } from "@/db/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get("code")
   const next = requestUrl.searchParams.get("next")
+  const cliCode = requestUrl.searchParams.get("cli_code")
 
   if (code) {
-    const supabase = createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    const supabase = createServerClient()
+    const { data } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (cliCode && data.user) {
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      await supabaseAdmin
+        .from("cli_auth_codes")
+        .update({ user_id: data.user.id, status: "confirmed" })
+        .eq("code", cliCode)
+        .eq("status", "pending")
+
+      const successUrl = new URL("/login/cli-success", requestUrl.origin)
+      return NextResponse.redirect(successUrl.toString())
+    }
   }
 
   if (next) {

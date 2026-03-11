@@ -5,20 +5,22 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/db/supabase/client"
 import {
-  BarChartIcon,
   BoxIcon,
-  FilterIcon,
-  FolderOpenIcon,
-  Hash,
   HomeIcon,
+  LayoutDashboardIcon,
   LogIn,
   LogOutIcon,
+  MonitorIcon,
+  MoonIcon,
   PanelLeftIcon,
-  PlusIcon,
+  SettingsIcon,
+  SunIcon,
   TagIcon,
-  UsersIcon,
 } from "lucide-react"
 
+import { useTheme } from "next-themes"
+
+import type { Category } from "@/lib/types"
 import { cn, truncateString } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -27,32 +29,28 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { ModeToggle } from "@/app/providers"
 
 export function NavSidebar({
   categories,
   tags,
-  labels,
 }: {
-  categories?: string[]
-  labels?: string[]
+  categories?: Category[]
   tags?: string[]
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isSheetOpen, setSheetOpen] = useState(false)
   const router = useRouter()
+  const { setTheme } = useTheme()
 
   const handleLogout = async () => {
     const db = await createClient()
@@ -60,7 +58,7 @@ export function NavSidebar({
     if (error) {
       console.error("Error logging out:", error.message)
     } else {
-      router.push("/login") // Redirect to login page after logout
+      router.push("/login")
     }
   }
 
@@ -72,39 +70,23 @@ export function NavSidebar({
     <>
       <aside
         className={cn(
-          pathname.includes("admin")
-            ? "w-16 border-r border-black/10 dark:border-white/10"
-            : "w-42",
+          "w-42",
           "fixed inset-y-0 left-0 z-10 hidden sm:flex flex-col bg-[#FAFAFA] dark:bg-background"
         )}
       >
         <nav className="flex flex-col items-center gap-4 px-2 py-5">
-          {pathname.includes("admin") ? (
-            <>
-              <LogoAnimationLink />
-              <AdminNav pathname={pathname} />
-            </>
-          ) : (
-            <ProductNav
-              categories={categories}
-              tags={tags}
-              labels={labels}
-              searchParams={searchParams}
-            />
-          )}
+          <AgentNav
+            categories={categories}
+            tags={tags}
+            searchParams={searchParams}
+          />
         </nav>
 
-        <div
-          className={
-            pathname.includes("admin")
-              ? "flex flex-col gap-4 items-center py-5 mt-auto px-2 mx-2"
-              : "pl-3 flex flex-col justify-center gap-4 items-start pb-8"
-          }
-        >
+        <div className="pl-3 flex flex-col justify-center gap-4 items-start pb-8">
           <DropdownMenu>
             <DropdownMenuTrigger>
               <Avatar>
-                <AvatarFallback className="bg-gradient-to-r from-yellow-300 to-yellow-300" />
+                <AvatarFallback className="bg-gradient-to-r from-emerald-300 to-emerald-400" />
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -114,10 +96,35 @@ export function NavSidebar({
               <div className="p-[1px] bg-background rounded-md">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-primary" />
-                <DropdownMenuItem>
-                  <Link href="/admin">Admin</Link>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard">Dashboard</Link>
                 </DropdownMenuItem>
-
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <SunIcon className="mr-2 size-4 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" />
+                    <MoonIcon className="absolute mr-2 size-4 rotate-90 scale-0 dark:rotate-0 dark:scale-100" />
+                    Theme
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem onClick={() => setTheme("light")}>
+                        <SunIcon className="mr-2 size-4" />
+                        Light
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("dark")}>
+                        <MoonIcon className="mr-2 size-4" />
+                        Dark
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("system")}>
+                        <MonitorIcon className="mr-2 size-4" />
+                        System
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
                 <DropdownMenuSeparator className="bg-primary" />
                 <DropdownMenuItem>
                   <Button className="w-full" onClick={handleLogout}>
@@ -127,11 +134,9 @@ export function NavSidebar({
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          <div className="">
-            <ModeToggle />
-          </div>
         </div>
       </aside>
+
       <div className="flex flex-col gap-4 pb-2 px-2">
         <header
           className={cn(
@@ -155,60 +160,67 @@ export function NavSidebar({
               className="sm:max-w-[15rem] py-4 pl-1 border-r border-primary/10"
             >
               <nav className="flex flex-col items-start gap-4 px-2 py-5">
-                {pathname.includes("admin") ? (
-                  <>
-                    <LogoAnimationLink />
-                    <AdminNav pathname={pathname} />
-                  </>
-                ) : (
-                  <>
-                    <ProductNav
-                      tags={tags}
-                      labels={labels}
-                      categories={categories}
-                      handleLinkClick={handleLinkClick}
-                      searchParams={searchParams}
+                <AgentNav
+                  tags={tags}
+                  categories={categories}
+                  handleLinkClick={handleLinkClick}
+                  searchParams={searchParams}
+                >
+                  <div className="my-4 space-y-3">
+                    <Link
+                      href="/"
+                      className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+                      prefetch={false}
+                      onClick={handleLinkClick}
                     >
-                      <div className="my-4 space-y-3">
-                        <Link
-                          href="/"
-                          className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
-                          prefetch={false}
-                          onClick={handleLinkClick}
-                        >
-                          <HomeIcon className="h-5 w-5" />
-                          Home
-                        </Link>
-                        <Link
-                          href="/submit"
-                          className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
-                          prefetch={false}
-                          onClick={handleLinkClick}
-                        >
-                          <PlusIcon className="h-5 w-5" />
-                          Submit
-                        </Link>
-
-                        <Link
-                          href="/login"
-                          className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
-                          prefetch={false}
-                          onClick={handleLinkClick}
-                        >
-                          <LogIn className="h-5 w-5" />
-                          Login
-                        </Link>
-                      </div>
-                    </ProductNav>
-                  </>
-                )}
+                      <HomeIcon className="h-5 w-5" />
+                      Home
+                    </Link>
+                    <Link
+                      href="/explore"
+                      className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+                      prefetch={false}
+                      onClick={handleLinkClick}
+                    >
+                      <BoxIcon className="h-5 w-5" />
+                      Explore
+                    </Link>
+                    <Link
+                      href="/dashboard"
+                      className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+                      prefetch={false}
+                      onClick={handleLinkClick}
+                    >
+                      <LayoutDashboardIcon className="h-5 w-5" />
+                      Dashboard
+                    </Link>
+                    <Link
+                      href="/settings"
+                      className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+                      prefetch={false}
+                      onClick={handleLinkClick}
+                    >
+                      <SettingsIcon className="h-5 w-5" />
+                      Settings
+                    </Link>
+                    <Link
+                      href="/login"
+                      className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+                      prefetch={false}
+                      onClick={handleLinkClick}
+                    >
+                      <LogIn className="h-5 w-5" />
+                      Login
+                    </Link>
+                  </div>
+                </AgentNav>
               </nav>
               <div className="flex flex-col items-start pl-4">
-                <nav className="mb-6   flex gap-4 ">
+                <nav className="mb-6 flex gap-4">
                   <DropdownMenu>
                     <DropdownMenuTrigger>
                       <Avatar>
-                        <AvatarFallback className="bg-gradient-to-r from-yellow-300 to-yellow-300" />
+                        <AvatarFallback className="bg-gradient-to-r from-emerald-300 to-emerald-400" />
                       </Avatar>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -218,8 +230,35 @@ export function NavSidebar({
                       <div className="p-[1px] bg-background rounded-md">
                         <DropdownMenuLabel>My Account</DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-primary" />
-                        <DropdownMenuItem>Settings</DropdownMenuItem>
-                        <DropdownMenuItem>Support</DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/dashboard">Dashboard</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/settings">Settings</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <SunIcon className="mr-2 size-4 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" />
+                            <MoonIcon className="absolute mr-2 size-4 rotate-90 scale-0 dark:rotate-0 dark:scale-100" />
+                            Theme
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuPortal>
+                            <DropdownMenuSubContent>
+                              <DropdownMenuItem onClick={() => setTheme("light")}>
+                                <SunIcon className="mr-2 size-4" />
+                                Light
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setTheme("dark")}>
+                                <MoonIcon className="mr-2 size-4" />
+                                Dark
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setTheme("system")}>
+                                <MonitorIcon className="mr-2 size-4" />
+                                System
+                              </DropdownMenuItem>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuPortal>
+                        </DropdownMenuSub>
                         <DropdownMenuSeparator className="bg-primary" />
                         <DropdownMenuItem>
                           <Button className="w-full" onClick={handleLogout}>
@@ -229,7 +268,6 @@ export function NavSidebar({
                       </div>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <ModeToggle />
                 </nav>
               </div>
             </SheetContent>
@@ -240,70 +278,68 @@ export function NavSidebar({
   )
 }
 
-type ProductNavProps = {
-  categories?: string[]
+type AgentNavProps = {
+  categories?: Category[]
   tags?: string[]
-  labels?: string[]
   handleLinkClick?: () => void
   searchParams: URLSearchParams
   children?: ReactNode
 }
 
-function ProductNav({
+function AgentNav({
   categories,
   tags,
-  labels,
   searchParams,
   handleLinkClick,
   children,
-}: ProductNavProps) {
+}: AgentNavProps) {
   return (
-    <div className="">
+    <div>
       <LogoAnimationLink />
       {children}
       <ScrollArea className="h-[calc(100vh-320px)] md:h-[calc(100vh-200px)] flex flex-col gap-4 pl-2">
-        {categories && categories?.length > 0 && (
+        {categories && categories.length > 0 && (
           <div className="flex items-center gap-2 mt-6 text-muted-foreground">
-            <BoxIcon className="size-5 stroke-yellow-400" />
+            <BoxIcon className="size-5 stroke-emerald-400" />
             <p className="text-sm md:hidden">Categories</p>
           </div>
         )}
         <ul className="mt-2 w-36 flex flex-col gap-2 items-start justify-center py-2">
-          {categories?.map((category: string, index: number) => (
-            <li key={`category-${index}-${category}`}>
+          {categories?.map((category, index) => (
+            <li key={`category-${index}-${category.id}`}>
               <Link
-                href={`/products?category=${category}`}
+                href={`/explore?category=${category.name}`}
                 onClick={handleLinkClick}
                 className={cn(
                   "flex items-start space-x-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 rounded-md px-2 py-0.5",
                   "shadow-[0_0_0_1px_rgba(0,0,0,0.1)_inset,0_0.5px_0.5px_rgba(0,0,0,0.05)_inset,0_-0.5px_0.5px_rgba(0,0,0,0.05)_inset,0_1px_2px_rgba(0,0,0,0.1)]",
                   "dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.06)_inset,0_0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_-0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_1px_rgba(0,0,0,0.3),0_1px_2px_rgba(0,0,0,0.4)]",
                   "dark:hover:shadow-[0_0_0_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_-0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_1px_rgba(0,0,0,0.4),0_1px_2px_rgba(0,0,0,0.5)]",
-                  searchParams.get("category") === category
-                    ? "bg-yellow-400 text-black dark:text-black"
+                  searchParams.get("category") === category.name
+                    ? "bg-emerald-400 text-black dark:text-black"
                     : ""
                 )}
                 prefetch={false}
               >
                 <span className="px-1">
-                  {category && truncateString(category, 12)}
+                  {truncateString(category.name, 14)}
                 </span>
               </Link>
             </li>
           ))}
         </ul>
 
-        {tags && tags?.length > 0 && (
+        {tags && tags.length > 0 && (
           <div className="flex items-center gap-2 mt-6 text-muted-foreground">
             <TagIcon className="size-5 stroke-pink-400" />
             <p className="text-sm md:hidden">Tags</p>
           </div>
         )}
         <ul className="mt-2 md:w-36 flex flex-col gap-2 items-start justify-center py-2">
-          {tags?.map((tag: string, index: number) => (
+          {tags?.map((tag, index) => (
             <li key={`tag-${index}-${tag}`}>
               <Link
-                href={`/products?tag=${tag}`}
+                href={`/explore?tag=${tag}`}
                 onClick={handleLinkClick}
                 className={cn(
                   "flex items-start space-x-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 rounded-md px-2 py-0.5",
@@ -317,38 +353,7 @@ function ProductNav({
                 prefetch={false}
               >
                 <span className="px-1 truncate">
-                  {tag && truncateString(tag, 12)}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        {labels && labels?.length > 0 && (
-          <div className="flex items-center gap-2 mt-6 text-muted-foreground">
-            <Hash className="size-5 stroke-cyan-400" />
-            <p className="text-sm md:hidden">Labels</p>
-          </div>
-        )}
-        <ul className="mt-2 w-36 flex flex-col gap-2 items-start justify-center py-2">
-          {labels?.map((label: string, index: number) => (
-            <li key={`label-${index}-${label}`}>
-              <Link
-                href={`/products?label=${label}`}
-                onClick={handleLinkClick}
-                className={cn(
-                  "flex items-start space-x-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 rounded-md px-2 py-0.5",
-                  "shadow-[0_0_0_1px_rgba(0,0,0,0.1)_inset,0_0.5px_0.5px_rgba(0,0,0,0.05)_inset,0_-0.5px_0.5px_rgba(0,0,0,0.05)_inset,0_1px_2px_rgba(0,0,0,0.1)]",
-                  "dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.06)_inset,0_0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_-0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_1px_rgba(0,0,0,0.3),0_1px_2px_rgba(0,0,0,0.4)]",
-                  "dark:hover:shadow-[0_0_0_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_-0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_1px_rgba(0,0,0,0.4),0_1px_2px_rgba(0,0,0,0.5)]",
-                  searchParams.get("label") === label
-                    ? "bg-cyan-400 text-black dark:text-black"
-                    : ""
-                )}
-                prefetch={false}
-              >
-                <span className="text-ellipsis overflow-hidden">
-                  {label && truncateString(label, 12)}
+                  {truncateString(tag, 14)}
                 </span>
               </Link>
             </li>
@@ -359,106 +364,17 @@ function ProductNav({
   )
 }
 
-function AdminNav({ pathname }: { pathname: string }) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            href="/admin"
-            className={cn(
-              "flex gap-2 md:gap-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8",
-              {
-                "bg-accent text-accent-foreground": pathname === "/admin",
-              }
-            )}
-            prefetch={false}
-          >
-            <BarChartIcon className="h-5 w-5" />
-            <span className="md:sr-only">Overview</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent side="right">Dashboard</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            href="/admin/products"
-            className={cn(
-              "flex gap-2 md:gap-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8",
-              {
-                "bg-accent text-accent-foreground":
-                  pathname === "/admin/products",
-              }
-            )}
-            prefetch={false}
-          >
-            <FolderOpenIcon className="h-5 w-5" />
-            <span className="md:sr-only">Products</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent side="right">Products</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            href="/admin/users"
-            className={cn(
-              "flex gap-2 md:gap-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8",
-              {
-                "bg-accent text-accent-foreground": pathname === "/admin/users",
-              }
-            )}
-            prefetch={false}
-          >
-            <UsersIcon className="h-5 w-5" />
-            <span className="md:sr-only">Users</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent side="right">Users</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            href="/admin/filters"
-            className={cn(
-              "flex gap-2 md:gap-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8",
-              {
-                "bg-accent text-accent-foreground":
-                  pathname === "/admin/filters",
-              }
-            )}
-            prefetch={false}
-          >
-            <FilterIcon className="h-5 w-5" />
-            <span className="md:sr-only">Filters</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent side="right">Filters</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
-
 export function LogoAnimationLink() {
   return (
     <Button
-      className="relative w-full size-9 rounded-full bg-black"
+      className="relative w-full h-9 px-3 rounded-md bg-black"
       variant="outline"
       asChild
     >
-      <Link href="/" className="flex justify-center">
-        <div className="absolute bg-yellow-300/90 h-[80%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_40s_linear_infinite]" />
-        <div className="absolute bg-pink-300/90 h-[80%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_30s_linear_infinite]" />
-        <div className="absolute bg-cyan-300/70 h-[80%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_20s_linear_infinite]" />
-        <div className="absolute bg-yellow-300/90 h-[80%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_15s_linear_infinite]" />
-        <div className="absolute bg-pink-300/70 h-[80%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_10s_linear_infinite]" />
-
-        <div className="absolute bg-pink-300/90 h-[40%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_80s_linear_infinite]" />
-        <div className="absolute bg-cyan-300/70 h-[40%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_60s_linear_infinite]" />
-        <div className="absolute bg-yellow-300/90 h-[40%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_40s_linear_infinite]" />
-        <div className="absolute bg-pink-300/90 h-[40%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_30s_linear_infinite]" />
-        <div className="absolute bg-cyan-300/90 h-[40%] w-[2px] rounded-bl-full rounded-br-full l-0 r-0 animate-[spin-scale_20s_linear_infinite]" />
+      <Link href="/" className="flex items-center justify-center">
+        <span className="text-sm font-bold text-white tracking-tight">
+          web42
+        </span>
       </Link>
     </Button>
   )

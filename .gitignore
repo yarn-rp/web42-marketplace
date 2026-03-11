@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+**/node_modules
+packages/cli/dist
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -27,6 +29,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+supabase/.env
 
 # vercel
 .vercel
