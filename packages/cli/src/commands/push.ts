@@ -1,41 +1,53 @@
 import { createHash } from "crypto"
-import { readFileSync, existsSync, statSync } from "fs"
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "fs"
 import { join, relative } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
-import { glob } from "glob"
 import ora from "ora"
 
 import { apiPost } from "../utils/api.js"
 import { requireAuth } from "../utils/config.js"
+import { openclawAdapter } from "../platforms/openclaw/adapter.js"
 
-const HARDCODED_EXCLUDES = [
-  "auth-profiles.json",
-  "MEMORY.md",
-  "memory/**",
-  "sessions/**",
-  ".git/**",
-  "node_modules/**",
-  ".DS_Store",
-  "*.log",
-]
-
-const TEMPLATE_VARS: Array<[RegExp, string]> = [
-  [/\/Users\/[^/]+\/.openclaw/g, "{{OPENCLAW_HOME}}"],
-  [/\/home\/[^/]+\/.openclaw/g, "{{OPENCLAW_HOME}}"],
-  [/C:\\Users\\[^\\]+\\.openclaw/g, "{{OPENCLAW_HOME}}"],
-]
-
-function sanitizeContent(content: string): string {
-  let result = content
-  for (const [pattern, replacement] of TEMPLATE_VARS) {
-    result = result.replace(pattern, replacement)
-  }
-  return result
+function hashContent(content: string): string {
+  return createHash("sha256").update(content).digest("hex")
 }
 
-function hashFile(content: string): string {
-  return createHash("sha256").update(content).digest("hex")
+function readPackedFiles(
+  dir: string
+): Array<{ path: string; content: string; hash: string }> {
+  const files: Array<{ path: string; content: string; hash: string }> = []
+
+  function walk(currentDir: string) {
+    const entries = readdirSync(currentDir, { withFileTypes: true })
+    for (const entry of entries) {
+      const fullPath = join(currentDir, entry.name)
+      if (entry.isDirectory()) {
+        walk(fullPath)
+      } else {
+        if (entry.name === "manifest.json" && currentDir === dir) continue
+        const stat = statSync(fullPath)
+        if (stat.size > 1024 * 1024) continue
+        try {
+          const content = readFileSync(fullPath, "utf-8")
+          const relPath = relative(dir, fullPath)
+          files.push({ path: relPath, content, hash: hashContent(content) })
+        } catch {
+          // Skip binary files
+        }
+      }
+    }
+  }
+
+  walk(dir)
+  return files
 }
 
 export const pushCommand = new Command("push")
@@ -52,9 +64,8 @@ export const pushCommand = new Command("push")
       process.exit(1)
     }
 
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"))
+    let manifest = JSON.parse(readFileSync(manifestPath, "utf-8"))
 
-    // Validate manifest
     if (!manifest.name || !manifest.version || !manifest.author) {
       console.log(
         chalk.red(
@@ -64,60 +75,50 @@ export const pushCommand = new Command("push")
       process.exit(1)
     }
 
-    const spinner = ora("Scanning workspace...").start()
+    const spinner = ora("Preparing agent package...").start()
 
-    // Build ignore patterns
-    const ignorePatterns = [...HARDCODED_EXCLUDES]
-    const web42ignorePath = join(cwd, ".web42ignore")
-    if (existsSync(web42ignorePath)) {
-      const ignoreContent = readFileSync(web42ignorePath, "utf-8")
-      ignoreContent
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith("#"))
-        .forEach((pattern) => ignorePatterns.push(pattern))
-    }
+    const web42Dir = join(cwd, ".web42")
+    let processedFiles: Array<{ path: string; content: string; hash: string }>
 
-    // Scan files
-    const allFiles = await glob("**/*", {
-      cwd,
-      nodir: true,
-      ignore: ignorePatterns,
-      dot: true,
-    })
+    if (existsSync(web42Dir)) {
+      spinner.text = "Reading packed artifact..."
+      processedFiles = readPackedFiles(web42Dir)
 
-    spinner.text = `Found ${allFiles.length} files. Processing...`
+      const packedManifestPath = join(web42Dir, "manifest.json")
+      if (existsSync(packedManifestPath)) {
+        manifest = JSON.parse(readFileSync(packedManifestPath, "utf-8"))
+      }
+    } else {
+      spinner.text = "No .web42/ found, packing automatically..."
+      const result = await openclawAdapter.pack({ cwd, outputDir: ".web42" })
+      processedFiles = result.files
 
-    // Read and process files
-    const processedFiles: Array<{
-      path: string
-      content: string
-      hash: string
-    }> = []
-
-    for (const filePath of allFiles) {
-      const fullPath = join(cwd, filePath)
-      const stat = statSync(fullPath)
-
-      // Skip files larger than 1MB
-      if (stat.size > 1024 * 1024) {
-        console.log(chalk.yellow(`  Skipping ${filePath} (>1MB)`))
-        continue
+      const existingKeys = new Set(
+        (manifest.configVariables ?? []).map((v: { key: string }) => v.key)
+      )
+      for (const cv of result.configVariables) {
+        if (!existingKeys.has(cv.key)) {
+          if (!manifest.configVariables) manifest.configVariables = []
+          manifest.configVariables.push(cv)
+          existingKeys.add(cv.key)
+        }
       }
 
-      try {
-        let content = readFileSync(fullPath, "utf-8")
-        content = sanitizeContent(content)
-        const hash = hashFile(content)
-        processedFiles.push({ path: filePath, content, hash })
-      } catch {
-        // Skip binary files
+      // Write the packed artifact so it can be inspected later
+      mkdirSync(web42Dir, { recursive: true })
+      for (const file of result.files) {
+        const filePath = join(web42Dir, file.path)
+        mkdirSync(join(filePath, ".."), { recursive: true })
+        writeFileSync(filePath, file.content, "utf-8")
       }
+      writeFileSync(
+        join(web42Dir, "manifest.json"),
+        JSON.stringify(manifest, null, 2) + "\n"
+      )
     }
 
     spinner.text = `Pushing ${processedFiles.length} files...`
 
-    // Read README if present
     let readme = ""
     const readmePath = join(cwd, "README.md")
     if (existsSync(readmePath)) {
@@ -125,7 +126,6 @@ export const pushCommand = new Command("push")
     }
 
     try {
-      // Create or update the agent
       const agentResult = await apiPost<{
         agent: { id: string }
         created?: boolean

@@ -1,5 +1,8 @@
 "use client"
 
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+
 import { cn } from "@/lib/utils"
 
 interface MarkdownRendererProps {
@@ -11,69 +14,27 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
   return (
     <div
       className={cn(
-        "prose prose-neutral dark:prose-invert max-w-none",
-        "prose-headings:font-semibold",
+        "prose prose-sm dark:prose-invert max-w-none sm:prose-base",
+        "prose-headings:font-semibold prose-headings:tracking-tight",
+        "prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
+        "prose-p:leading-7",
         "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
-        "prose-code:font-mono prose-code:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:text-sm",
-        "prose-pre:font-mono prose-pre:rounded-lg prose-pre:bg-muted",
+        "prose-code:before:content-none prose-code:after:content-none",
+        "prose-code:font-mono prose-code:rounded-md prose-code:border prose-code:border-border prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[13px] prose-code:font-normal",
+        "prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-muted/50",
+        "prose-pre:font-mono prose-pre:text-[13px]",
         "prose-img:rounded-lg",
+        "prose-blockquote:border-l-primary/30 prose-blockquote:text-muted-foreground",
+        "prose-hr:border-border",
+        "prose-strong:font-semibold",
+        "prose-table:text-sm",
+        "prose-th:border prose-th:border-border prose-th:px-3 prose-th:py-2",
+        "prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-2",
+        "prose-li:marker:text-muted-foreground",
         className
       )}
-      dangerouslySetInnerHTML={{ __html: simpleMarkdown(content) }}
-    />
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
   )
-}
-
-function simpleMarkdown(md: string): string {
-  let html = md
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-
-  // Code blocks
-  html = html.replace(
-    /```(\w*)\n([\s\S]*?)```/g,
-    (_match, _lang, code) =>
-      `<pre><code>${code.trim()}</code></pre>`
-  )
-
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, "<code>$1</code>")
-
-  // Headers
-  html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>")
-  html = html.replace(/^## (.+)$/gm, "<h2>$1</h2>")
-  html = html.replace(/^# (.+)$/gm, "<h1>$1</h1>")
-
-  // Bold and italic
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>")
-
-  // Links
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-  )
-
-  // Images
-  html = html.replace(
-    /!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<img src="$2" alt="$1" />'
-  )
-
-  // Unordered lists
-  html = html.replace(/^- (.+)$/gm, "<li>$1</li>")
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
-
-  // Paragraphs
-  html = html.replace(/\n\n/g, "</p><p>")
-  html = `<p>${html}</p>`
-
-  // Horizontal rules
-  html = html.replace(/<p>---<\/p>/g, "<hr />")
-
-  // Clean empty paragraphs
-  html = html.replace(/<p>\s*<\/p>/g, "")
-
-  return html
 }

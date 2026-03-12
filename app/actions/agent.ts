@@ -5,7 +5,7 @@ import { cache } from "react"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/db/supabase/server"
 
-import type { Agent, AgentVisibility } from "@/lib/types"
+import type { Agent, AgentLicense, AgentResource, AgentVisibility } from "@/lib/types"
 
 export type SortOption = "trending" | "stars" | "installs" | "recent"
 
@@ -73,6 +73,7 @@ export const getAgents = cache(
     let query = db
       .from("agents")
       .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon))")
+      .eq("visibility", "public")
 
     if (search) {
       query = query.or(
@@ -92,6 +93,32 @@ export const getAgents = cache(
           .from("agent_categories")
           .select("agent_id")
           .eq("category_id", cat.id)
+
+        if (agentIds && agentIds.length > 0) {
+          query = query.in(
+            "id",
+            agentIds.map((row) => row.agent_id)
+          )
+        } else {
+          return []
+        }
+      } else {
+        return []
+      }
+    }
+
+    if (tag) {
+      const { data: tagRow } = await db
+        .from("tags")
+        .select("id")
+        .eq("name", tag)
+        .maybeSingle()
+
+      if (tagRow) {
+        const { data: agentIds } = await db
+          .from("agent_tags")
+          .select("agent_id")
+          .eq("tag_id", tagRow.id)
 
         if (agentIds && agentIds.length > 0) {
           query = query.in(
@@ -126,6 +153,7 @@ export const getFeaturedAgents = cache(async () => {
     .from("agents")
     .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon))")
     .eq("featured", true)
+    .eq("visibility", "public")
     .order("stars_count", { ascending: false })
     .limit(6)
 
@@ -326,6 +354,22 @@ export async function remixAgent(agentId: string) {
     return { error: insertError.message }
   }
 
+  const { data: originalFiles } = await db
+    .from("agent_files")
+    .select("path, content, content_hash, storage_url")
+    .eq("agent_id", agentId)
+
+  if (originalFiles && originalFiles.length > 0) {
+    const remixFiles = originalFiles.map((f: any) => ({
+      agent_id: remix.id,
+      path: f.path,
+      content: f.content,
+      content_hash: f.content_hash,
+      storage_url: f.storage_url,
+    }))
+    await db.from("agent_files").insert(remixFiles)
+  }
+
   await db.rpc("increment_remix_count", { p_agent_id: agentId })
   revalidatePath("/")
 
@@ -404,6 +448,43 @@ export async function toggleAgentVisibility(
   return { success: true }
 }
 
+export async function deleteAgent(
+  agentId: string,
+  profileUsername: string
+) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error: filesError } = await db
+    .from("agent_files")
+    .delete()
+    .eq("agent_id", agentId)
+
+  if (filesError) {
+    console.error("Error deleting agent files:", filesError)
+    return { error: filesError.message }
+  }
+
+  const { error } = await db
+    .from("agents")
+    .delete()
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error deleting agent:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  revalidatePath("/explore")
+  return { success: true }
+}
+
 export async function updateAgentPrice(
   agentId: string,
   priceCents: number,
@@ -425,6 +506,337 @@ export async function updateAgentPrice(
   if (error) {
     console.error("Error updating agent price:", error)
     return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
+
+// ============================================================
+// Publishing actions
+// ============================================================
+
+export interface PublishValidation {
+  readme: boolean
+  profileImage: boolean
+  resources: boolean
+  license: boolean
+  tags: boolean
+  resourceCount: number
+}
+
+export async function getPublishValidation(
+  agentId: string
+): Promise<PublishValidation> {
+  const db = createClient()
+
+  const { data: agent } = await db
+    .from("agents")
+    .select("readme, profile_image_url, license")
+    .eq("id", agentId)
+    .single()
+
+  const { count: resourceCount } = await db
+    .from("agent_resources")
+    .select("id", { count: "exact", head: true })
+    .eq("agent_id", agentId)
+
+  const { count: tagCount } = await db
+    .from("agent_tags")
+    .select("agent_id", { count: "exact", head: true })
+    .eq("agent_id", agentId)
+
+  const rc = resourceCount ?? 0
+
+  return {
+    readme: !!agent?.readme && agent.readme.trim().length > 50,
+    profileImage: !!agent?.profile_image_url,
+    resources: rc >= 3,
+    license: !!agent?.license,
+    tags: (tagCount ?? 0) >= 1,
+    resourceCount: rc,
+  }
+}
+
+export async function publishAgent(agentId: string, profileUsername: string) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const validation = await getPublishValidation(agentId)
+  const errors: string[] = []
+
+  if (!validation.readme) errors.push("README must be at least 50 characters")
+  if (!validation.profileImage) errors.push("Profile image is required")
+  if (!validation.resources) errors.push(`At least 3 resources required (${validation.resourceCount}/3)`)
+  if (!validation.license) errors.push("License must be selected")
+  if (!validation.tags) errors.push("At least 1 tag is required")
+
+  if (errors.length > 0) {
+    return { error: errors.join(". "), validation }
+  }
+
+  const { error } = await db
+    .from("agents")
+    .update({
+      visibility: "public" as AgentVisibility,
+      published_at: new Date().toISOString(),
+    })
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error publishing agent:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  revalidatePath("/explore")
+  revalidatePath("/")
+  return { success: true }
+}
+
+export async function unpublishAgent(agentId: string, profileUsername: string) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error } = await db
+    .from("agents")
+    .update({ visibility: "private" as AgentVisibility })
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error unpublishing agent:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  revalidatePath("/explore")
+  revalidatePath("/")
+  return { success: true }
+}
+
+// ============================================================
+// Agent resources
+// ============================================================
+
+export const getAgentResources = cache(async (agentId: string) => {
+  const db = createClient()
+  const { data, error } = await db
+    .from("agent_resources")
+    .select("*")
+    .eq("agent_id", agentId)
+    .order("sort_order", { ascending: true })
+
+  if (error) {
+    console.error("Error fetching agent resources:", error)
+    return []
+  }
+
+  return data as AgentResource[]
+})
+
+export async function createAgentResource(
+  agentId: string,
+  resource: {
+    title: string
+    description?: string
+    type: "video" | "image" | "document"
+    url: string
+    thumbnail_url?: string
+  },
+  profileUsername: string
+) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { count } = await db
+    .from("agent_resources")
+    .select("id", { count: "exact", head: true })
+    .eq("agent_id", agentId)
+
+  const { data, error } = await db
+    .from("agent_resources")
+    .insert({
+      agent_id: agentId,
+      title: resource.title,
+      description: resource.description ?? "",
+      type: resource.type,
+      url: resource.url,
+      thumbnail_url: resource.thumbnail_url,
+      sort_order: (count ?? 0),
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error creating agent resource:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true, resource: data as AgentResource }
+}
+
+export async function deleteAgentResource(
+  resourceId: string,
+  profileUsername: string
+) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error } = await db
+    .from("agent_resources")
+    .delete()
+    .eq("id", resourceId)
+
+  if (error) {
+    console.error("Error deleting agent resource:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
+
+export async function reorderAgentResources(
+  agentId: string,
+  orderedIds: string[],
+  profileUsername: string
+) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const updates = orderedIds.map((id, index) =>
+    db
+      .from("agent_resources")
+      .update({ sort_order: index })
+      .eq("id", id)
+      .eq("agent_id", agentId)
+  )
+
+  const results = await Promise.all(updates)
+  const failed = results.find((r) => r.error)
+
+  if (failed?.error) {
+    console.error("Error reordering resources:", failed.error)
+    return { error: failed.error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
+
+// ============================================================
+// Agent metadata updates (profile image, license, tags)
+// ============================================================
+
+export async function updateAgentProfileImage(
+  agentId: string,
+  profileImageUrl: string | null,
+  profileUsername: string
+) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error } = await db
+    .from("agents")
+    .update({ profile_image_url: profileImageUrl })
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error updating agent profile image:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
+
+export async function updateAgentLicense(
+  agentId: string,
+  license: AgentLicense | null,
+  profileUsername: string
+) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error } = await db
+    .from("agents")
+    .update({ license })
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error updating agent license:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
+
+export async function updateAgentTags(
+  agentId: string,
+  tagIds: string[],
+  profileUsername: string
+) {
+  const db = createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error: deleteError } = await db
+    .from("agent_tags")
+    .delete()
+    .eq("agent_id", agentId)
+
+  if (deleteError) {
+    console.error("Error clearing agent tags:", deleteError)
+    return { error: deleteError.message }
+  }
+
+  if (tagIds.length > 0) {
+    const rows = tagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId }))
+    const { error: insertError } = await db
+      .from("agent_tags")
+      .insert(rows)
+
+    if (insertError) {
+      console.error("Error inserting agent tags:", insertError)
+      return { error: insertError.message }
+    }
   }
 
   revalidatePath(`/${profileUsername}`)

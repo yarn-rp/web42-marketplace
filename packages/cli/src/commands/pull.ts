@@ -76,6 +76,12 @@ export const pullCommand = new Command("pull")
           continue
         }
 
+        // Skip packaging artifacts that are regenerated on push
+        if (file.path === ".openclaw/config.json") {
+          skipped++
+          continue
+        }
+
         const filePath = join(cwd, file.path)
         mkdirSync(dirname(filePath), { recursive: true })
         writeFileSync(filePath, file.content, "utf-8")

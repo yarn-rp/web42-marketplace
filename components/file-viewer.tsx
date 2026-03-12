@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { FileIcon, Loader2Icon } from "lucide-react"
+import { FileIcon } from "lucide-react"
 
 import type { AgentFile } from "@/lib/types"
 import {
@@ -18,29 +17,6 @@ interface FileViewerProps {
 }
 
 export function FileViewer({ file }: FileViewerProps) {
-  const [content, setContent] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const fileName = file.path.split("/").pop() ?? file.path
-
-  useEffect(() => {
-    setLoading(true)
-    setContent(null)
-
-    if (file.storage_url) {
-      fetch(file.storage_url)
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to fetch")
-          return res.text()
-        })
-        .then(setContent)
-        .catch(() => setContent(null))
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
-    }
-  }, [file.storage_url])
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center gap-2 py-3 px-4">
@@ -49,19 +25,15 @@ export function FileViewer({ file }: FileViewerProps) {
       </CardHeader>
       <Separator />
       <CardContent className="p-0">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : content ? (
+        {file.content ? (
           <ScrollArea className="max-h-[500px]">
             <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed">
-              <code>{content}</code>
+              <code>{file.content}</code>
             </pre>
           </ScrollArea>
         ) : (
           <div className="py-12 text-center text-sm text-muted-foreground">
-            Unable to load file content
+            No content available
           </div>
         )}
       </CardContent>

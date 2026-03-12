@@ -1,10 +1,40 @@
-import { writeFileSync, existsSync } from "fs"
+import { writeFileSync, existsSync, readdirSync } from "fs"
 import { join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
 import inquirer from "inquirer"
 
 import { requireAuth } from "../utils/config.js"
+import {
+  AGENTS_MD,
+  IDENTITY_MD,
+  SOUL_MD,
+  TOOLS_MD,
+  USER_MD,
+  HEARTBEAT_MD,
+  INIT_BOOTSTRAP_MD,
+} from "../platforms/openclaw/templates.js"
+
+function detectWorkspaceSkills(cwd: string): string[] {
+  const skillsDir = join(cwd, "skills")
+  if (!existsSync(skillsDir)) return []
+
+  const skills: string[] = []
+  try {
+    const entries = readdirSync(skillsDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const skillMd = join(skillsDir, entry.name, "SKILL.md")
+        if (existsSync(skillMd)) {
+          skills.push(entry.name)
+        }
+      }
+    }
+  } catch {
+    // ignore read errors
+  }
+  return skills.sort()
+}
 
 const CATEGORIES = [
   "Customer Support",
@@ -42,6 +72,13 @@ export const initCommand = new Command("init")
     }
 
     const answers = await inquirer.prompt([
+      {
+        type: "list",
+        name: "platform",
+        message: "Platform:",
+        choices: ["openclaw"],
+        default: "openclaw",
+      },
       {
         type: "input",
         name: "name",
@@ -105,13 +142,24 @@ export const initCommand = new Command("init")
       },
     ])
 
+    const detectedSkills = detectWorkspaceSkills(cwd)
+    if (detectedSkills.length > 0) {
+      console.log(
+        chalk.dim(
+          `  Detected ${detectedSkills.length} skill(s): ${detectedSkills.join(", ")}`
+        )
+      )
+    }
+
     const manifest = {
+      format: "agentpkg/1",
+      platform: answers.platform,
       name: answers.name,
       description: answers.description,
       version: answers.version,
       author: config.username,
       channels: answers.channels,
-      skills: [] as string[],
+      skills: detectedSkills,
       plugins: [] as string[],
       modelPreferences: answers.primaryModel
         ? { primary: answers.primaryModel }
@@ -128,5 +176,49 @@ export const initCommand = new Command("init")
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n")
     console.log()
     console.log(chalk.green(`Created ${chalk.bold("manifest.json")}`))
-    console.log(chalk.dim("Run `web42 push` to publish your agent package."))
+
+    const scaffoldFiles: Array<{
+      name: string
+      content: string
+      alwaysWrite: boolean
+    }> = [
+      { name: "AGENTS.md", content: AGENTS_MD, alwaysWrite: false },
+      { name: "IDENTITY.md", content: IDENTITY_MD, alwaysWrite: false },
+      { name: "SOUL.md", content: SOUL_MD, alwaysWrite: false },
+      { name: "TOOLS.md", content: TOOLS_MD, alwaysWrite: false },
+      { name: "HEARTBEAT.md", content: HEARTBEAT_MD, alwaysWrite: false },
+      { name: "BOOTSTRAP.md", content: INIT_BOOTSTRAP_MD, alwaysWrite: false },
+      { name: "USER.md", content: USER_MD, alwaysWrite: true },
+    ]
+
+    const created: string[] = []
+    const skipped: string[] = []
+
+    for (const file of scaffoldFiles) {
+      const filePath = join(cwd, file.name)
+      if (!file.alwaysWrite && existsSync(filePath)) {
+        skipped.push(file.name)
+        continue
+      }
+      writeFileSync(filePath, file.content, "utf-8")
+      created.push(file.name)
+    }
+
+    if (created.length > 0) {
+      console.log(
+        chalk.green(`  Scaffolded: ${created.join(", ")}`)
+      )
+    }
+    if (skipped.length > 0) {
+      console.log(
+        chalk.dim(`  Skipped (already exist): ${skipped.join(", ")}`)
+      )
+    }
+
+    console.log()
+    console.log(
+      chalk.dim(
+        "Run `web42 pack` to bundle your agent, or `web42 push` to pack and publish."
+      )
+    )
   })

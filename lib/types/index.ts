@@ -1,5 +1,8 @@
 export type {
   Agent,
+  AgentLicense,
+  AgentResource,
+  AgentResourceType,
   AgentVisibility,
   AgentVersion,
   AgentFile,

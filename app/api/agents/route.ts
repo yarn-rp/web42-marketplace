@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   let query = db
     .from("agents")
     .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
+    .eq("visibility", "public")
 
   if (search) {
     query = query.or(
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
         owner_id: userId,
         cover_image_url,
         demo_video_url,
+        visibility: "private",
       })
       .select()
       .single()

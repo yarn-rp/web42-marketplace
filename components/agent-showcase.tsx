@@ -2,35 +2,36 @@ import Link from "next/link"
 import {
   CalendarIcon,
   Download,
-  ExternalLink,
   GitFork,
   TagIcon,
   UserIcon,
 } from "lucide-react"
 
-import type { Agent } from "@/lib/types"
+import type { Agent, AgentFile, AgentResource } from "@/lib/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 
+import { AgentDetailTabs } from "./agent-detail-tabs"
 import { AgentPriceBadge } from "./agent-price-badge"
 import { InstallSnippet } from "./install-snippet"
-import { MarkdownRenderer } from "./markdown-renderer"
 import { RemixButton } from "./remix-button"
 import { StarButton } from "./star-button"
 
 interface AgentShowcaseProps {
   agent: Agent
+  files?: AgentFile[]
+  resources?: AgentResource[]
+  isOwner?: boolean
 }
 
-export function AgentShowcase({ agent }: AgentShowcaseProps) {
+export function AgentShowcase({ agent, files = [], resources = [], isOwner = false }: AgentShowcaseProps) {
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
 
@@ -61,7 +62,16 @@ export function AgentShowcase({ agent }: AgentShowcaseProps) {
       <div className="flex flex-col gap-8 md:flex-row">
         {/* Main content */}
         <div className="min-w-0 flex-1">
-          <h1 className="mb-2 text-3xl font-bold md:text-4xl">{agent.name}</h1>
+          <div className="mb-2 flex items-center gap-3">
+            {agent.profile_image_url && (
+              <img
+                src={agent.profile_image_url}
+                alt={agent.name}
+                className="size-12 shrink-0 rounded-xl object-cover"
+              />
+            )}
+            <h1 className="text-3xl font-bold md:text-4xl">{agent.name}</h1>
+          </div>
           <p className="mb-4 text-base text-muted-foreground">
             {agent.description}
           </p>
@@ -124,10 +134,52 @@ export function AgentShowcase({ agent }: AgentShowcaseProps) {
             <InstallSnippet username={username} agentSlug={agent.slug} />
           </div>
 
+          {/* Resources media gallery */}
+          {resources.length > 0 && (
+            <div className="mb-6">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
+                Resources
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {resources.map((resource) => (
+                  <div
+                    key={resource.id}
+                    className="overflow-hidden rounded-lg border bg-muted/30"
+                  >
+                    {resource.type === "video" ? (
+                      <video
+                        src={resource.url}
+                        controls
+                        preload="metadata"
+                        className="aspect-video w-full bg-black"
+                      />
+                    ) : (
+                      <img
+                        src={resource.url}
+                        alt={resource.title}
+                        className="aspect-video w-full object-cover"
+                      />
+                    )}
+                    <div className="px-3 py-2">
+                      <p className="truncate text-sm font-medium">
+                        {resource.title}
+                      </p>
+                      {resource.description && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {resource.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Separator className="mb-6" />
 
-          {/* README */}
-          {agent.readme && <MarkdownRenderer content={agent.readme} />}
+          {/* Tabbed content view */}
+          <AgentDetailTabs agent={agent} files={files} isOwner={isOwner} />
         </div>
 
         {/* Sidebar */}
@@ -172,10 +224,31 @@ export function AgentShowcase({ agent }: AgentShowcaseProps) {
                 </span>
               </div>
 
+              {agent.license && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">License</span>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {agent.license}
+                  </Badge>
+                </div>
+              )}
               {agent.manifest?.modelPreferences?.primary && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Model</span>
                   <span>{agent.manifest.modelPreferences.primary}</span>
+                </div>
+              )}
+              {agent.published_at && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CalendarIcon className="size-4" />
+                  <span>
+                    Published{" "}
+                    {new Date(agent.published_at).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -223,79 +296,6 @@ export function AgentShowcase({ agent }: AgentShowcaseProps) {
               </CardContent>
             </Card>
           )}
-
-          {/* Channels / Skills / Plugins */}
-          {agent.manifest &&
-            (agent.manifest.channels?.length ||
-              agent.manifest.skills?.length ||
-              agent.manifest.plugins?.length) && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Capabilities</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {agent.manifest.channels &&
-                    agent.manifest.channels.length > 0 && (
-                      <div>
-                        <CardDescription className="mb-2 text-xs uppercase tracking-wider">
-                          Channels
-                        </CardDescription>
-                        <div className="flex flex-wrap gap-1.5">
-                          {agent.manifest.channels.map((ch) => (
-                            <Badge
-                              key={ch}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {ch}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                  {agent.manifest.skills &&
-                    agent.manifest.skills.length > 0 && (
-                      <div>
-                        <CardDescription className="mb-2 text-xs uppercase tracking-wider">
-                          Skills
-                        </CardDescription>
-                        <div className="flex flex-wrap gap-1.5">
-                          {agent.manifest.skills.map((skill) => (
-                            <Badge
-                              key={skill}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {skill}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                  {agent.manifest.plugins &&
-                    agent.manifest.plugins.length > 0 && (
-                      <div>
-                        <CardDescription className="mb-2 text-xs uppercase tracking-wider">
-                          Plugins
-                        </CardDescription>
-                        <div className="flex flex-wrap gap-1.5">
-                          {agent.manifest.plugins.map((plugin) => (
-                            <Badge
-                              key={plugin}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {plugin}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </CardContent>
-              </Card>
-            )}
 
           {/* Remixed from */}
           {agent.remixed_from_id && agent.remixed_from && (

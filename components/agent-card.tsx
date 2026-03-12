@@ -72,12 +72,20 @@ export function AgentCard({
 
           <CardHeader className="p-4 pb-2">
             <div className="flex items-center gap-2">
-              <Avatar className="size-5">
-                <AvatarImage src={owner?.avatar_url ?? undefined} />
-                <AvatarFallback className="text-[9px]">
-                  {username[0]?.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              {agent.profile_image_url ? (
+                <img
+                  src={agent.profile_image_url}
+                  alt={agent.name}
+                  className="size-5 shrink-0 rounded object-cover"
+                />
+              ) : (
+                <Avatar className="size-5">
+                  <AvatarImage src={owner?.avatar_url ?? undefined} />
+                  <AvatarFallback className="text-[9px]">
+                    {username[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              )}
               <span className="font-mono text-xs text-muted-foreground">
                 @{username}
               </span>
@@ -113,6 +121,20 @@ export function AgentCard({
               <Download className="size-3" />
               {agent.installs_count}
             </span>
+            {agent.license && (
+              <Badge variant="outline" className="ml-auto font-mono text-[10px]">
+                {agent.license}
+              </Badge>
+            )}
+            {!agent.license && (agent.price_cents ?? 0) > 0 && (
+              <div className="ml-auto">
+                <AgentPriceBadge
+                  priceCents={agent.price_cents ?? 0}
+                  currency={agent.currency}
+                  className="text-[10px]"
+                />
+              </div>
+            )}
           </CardFooter>
         </Card>
       </Link>
