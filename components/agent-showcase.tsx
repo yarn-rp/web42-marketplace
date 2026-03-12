@@ -1,3 +1,6 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
 import {
   CalendarIcon,
@@ -7,7 +10,8 @@ import {
   UserIcon,
 } from "lucide-react"
 
-import type { Agent, AgentFile, AgentResource } from "@/lib/types"
+import type { PublishValidation } from "@/app/actions/agent"
+import type { Agent, AgentFile, AgentResource, Tag } from "@/lib/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -20,8 +24,11 @@ import { Separator } from "@/components/ui/separator"
 
 import { AgentDetailTabs } from "./agent-detail-tabs"
 import { AgentPriceBadge } from "./agent-price-badge"
-import { InstallSnippet } from "./install-snippet"
+import { GetAgentButton } from "./get-agent-button"
+import { InstallButton } from "./install-button"
+import { PublishDialog } from "./publish-dialog"
 import { RemixButton } from "./remix-button"
+import { ResourceGallery } from "./resource-gallery"
 import { StarButton } from "./star-button"
 
 interface AgentShowcaseProps {
@@ -29,70 +36,139 @@ interface AgentShowcaseProps {
   files?: AgentFile[]
   resources?: AgentResource[]
   isOwner?: boolean
+  hasAccess?: boolean
+  isAuthenticated?: boolean
+  validation?: PublishValidation | null
+  allTags?: Tag[]
+  selectedTagIds?: string[]
+  profileUsername?: string
 }
 
-export function AgentShowcase({ agent, files = [], resources = [], isOwner = false }: AgentShowcaseProps) {
+export function AgentShowcase({
+  agent,
+  files = [],
+  resources = [],
+  isOwner = false,
+  hasAccess = false,
+  isAuthenticated = false,
+  validation = null,
+  allTags = [],
+  selectedTagIds = [],
+  profileUsername = "",
+}: AgentShowcaseProps) {
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
 
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [galleryIndex, setGalleryIndex] = useState(0)
+
+  const openGallery = (index: number) => {
+    setGalleryIndex(index)
+    setGalleryOpen(true)
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-      {/* Cover image hero */}
-      {agent.cover_image_url && (
-        <div className="relative mb-8 w-full overflow-hidden rounded-xl">
-          <img
-            src={agent.cover_image_url}
-            alt={agent.name}
-            className="aspect-[21/9] w-full object-cover"
-          />
+      {/* Name and description at top */}
+      <div className="mb-6">
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          {agent.profile_image_url && (
+            <img
+              src={agent.profile_image_url}
+              alt={agent.name}
+              className="size-16 shrink-0 rounded-xl object-cover"
+            />
+          )}
+          <h1 className="text-3xl font-bold md:text-4xl">{agent.name}</h1>
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            {isOwner && validation && (
+              <PublishDialog
+                agent={agent}
+                validation={validation}
+                profileUsername={profileUsername}
+                variant="secondary"
+              />
+            )}
+            {isOwner || hasAccess ? (
+              <>
+                {!isOwner && !agent.remixed_from_id && (
+                  <RemixButton
+                    agentId={agent.id}
+                    agentName={agent.name}
+                    variant="outline"
+                  />
+                )}
+                <InstallButton username={username} agentSlug={agent.slug} />
+              </>
+            ) : (
+              <GetAgentButton
+                agentId={agent.id}
+                priceCents={agent.price_cents ?? 0}
+                isAuthenticated={isAuthenticated}
+              />
+            )}
+          </div>
+        </div>
+        <p className="text-base text-muted-foreground">{agent.description}</p>
+      </div>
+
+      {/* Resources gallery -- full width, max 4 visible */}
+      {resources.length > 0 && (
+        <div className="mb-8">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {resources.slice(0, 4).map((resource, index) => {
+              const isLast = index === 3
+              const remaining = resources.length - 4
+
+              return (
+                <button
+                  key={resource.id}
+                  type="button"
+                  className="group/res relative overflow-hidden rounded-lg border bg-muted/30 text-left transition hover:border-primary/40"
+                  onClick={() => openGallery(index)}
+                >
+                  {resource.type === "video" ? (
+                    <video
+                      src={resource.url}
+                      muted
+                      preload="metadata"
+                      className="aspect-video w-full bg-black object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={resource.url}
+                      alt={resource.title}
+                      className="aspect-video w-full object-cover"
+                    />
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover/res:bg-black/20" />
+                  {isLast && remaining > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <span className="text-lg font-semibold text-white">
+                        +{remaining} more
+                      </span>
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {agent.demo_video_url && !agent.cover_image_url && (
-        <div className="relative mb-8 aspect-video w-full overflow-hidden rounded-xl">
-          <iframe
-            src={agent.demo_video_url}
-            className="h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-      )}
+      <ResourceGallery
+        resources={resources}
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        initialIndex={galleryIndex}
+      />
 
       <div className="flex flex-col gap-8 md:flex-row">
         {/* Main content */}
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-center gap-3">
-            {agent.profile_image_url && (
-              <img
-                src={agent.profile_image_url}
-                alt={agent.name}
-                className="size-12 shrink-0 rounded-xl object-cover"
-              />
-            )}
-            <h1 className="text-3xl font-bold md:text-4xl">{agent.name}</h1>
-          </div>
-          <p className="mb-4 text-base text-muted-foreground">
-            {agent.description}
-          </p>
-
-          {/* Author */}
-          <Link
-            href={`/${username}`}
-            className="mb-6 inline-flex items-center gap-2 hover:underline"
-          >
-            <Avatar className="size-7">
-              <AvatarImage src={owner?.avatar_url ?? undefined} />
-              <AvatarFallback className="text-xs">
-                {username[0]?.toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="font-mono text-sm font-medium">@{username}</span>
-          </Link>
-
           {/* Remixed from banner */}
           {agent.remixed_from_id && agent.remixed_from && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-4 py-3">
+            <div className="mb-6 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-4 py-3">
               <GitFork className="size-4 shrink-0 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">
                 Remixed from{" "}
@@ -106,80 +182,18 @@ export function AgentShowcase({ agent, files = [], resources = [], isOwner = fal
             </div>
           )}
 
-          {/* Action bar */}
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <StarButton
-              agentId={agent.id}
-              initialStarred={agent.has_starred ?? false}
-              initialCount={agent.stars_count}
-            />
-            {!agent.remixed_from_id && (
-              <RemixButton agentId={agent.id} agentName={agent.name} />
-            )}
-            <div className="flex items-center gap-4 font-mono text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Download className="size-4" />
-                {agent.installs_count}
-              </span>
-              {!agent.remixed_from_id && (
-                <span className="flex items-center gap-1">
-                  <GitFork className="size-4" />
-                  {agent.remixes_count}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <InstallSnippet username={username} agentSlug={agent.slug} />
-          </div>
-
-          {/* Resources media gallery */}
-          {resources.length > 0 && (
-            <div className="mb-6">
-              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                Resources
-              </h3>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {resources.map((resource) => (
-                  <div
-                    key={resource.id}
-                    className="overflow-hidden rounded-lg border bg-muted/30"
-                  >
-                    {resource.type === "video" ? (
-                      <video
-                        src={resource.url}
-                        controls
-                        preload="metadata"
-                        className="aspect-video w-full bg-black"
-                      />
-                    ) : (
-                      <img
-                        src={resource.url}
-                        alt={resource.title}
-                        className="aspect-video w-full object-cover"
-                      />
-                    )}
-                    <div className="px-3 py-2">
-                      <p className="truncate text-sm font-medium">
-                        {resource.title}
-                      </p>
-                      {resource.description && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          {resource.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <Separator className="mb-6" />
 
           {/* Tabbed content view */}
-          <AgentDetailTabs agent={agent} files={files} isOwner={isOwner} />
+          <AgentDetailTabs
+            agent={agent}
+            files={files}
+            isOwner={isOwner}
+            resources={resources}
+            allTags={allTags}
+            selectedTagIds={selectedTagIds}
+            profileUsername={profileUsername}
+          />
         </div>
 
         {/* Sidebar */}
@@ -190,6 +204,37 @@ export function AgentShowcase({ agent, files = [], resources = [], isOwner = fal
               <CardTitle className="text-sm">About</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
+              <Link
+                href={`/${username}`}
+                className="flex items-center gap-2 hover:underline"
+              >
+                <Avatar className="size-8">
+                  <AvatarImage src={owner?.avatar_url ?? undefined} />
+                  <AvatarFallback className="text-xs">
+                    {username[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-mono font-medium">@{username}</span>
+              </Link>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <StarButton
+                  agentId={agent.id}
+                  initialStarred={agent.has_starred ?? false}
+                  initialCount={agent.stars_count}
+                />
+                <span className="flex items-center gap-1 font-mono text-muted-foreground">
+                  <Download className="size-4" />
+                  {agent.installs_count}
+                </span>
+                {!agent.remixed_from_id && (
+                  <span className="flex items-center gap-1 font-mono text-muted-foreground">
+                    <GitFork className="size-4" />
+                    {agent.remixes_count}
+                  </span>
+                )}
+              </div>
+
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Price</span>
                 <AgentPriceBadge

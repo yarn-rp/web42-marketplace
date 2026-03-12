@@ -46,7 +46,7 @@ export async function authenticateRequest(
     return { userId: tokenRow.user_id, source: "cli" }
   }
 
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()

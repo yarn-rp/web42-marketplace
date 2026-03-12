@@ -1,18 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import {
   BookOpen,
   CalendarIcon,
   FileIcon,
   FolderIcon,
   FolderOpen,
+  Loader2,
+  Pencil,
   Settings2,
+  ShoppingBag,
+  Wrench,
+  X,
 } from "lucide-react"
+import { toast } from "sonner"
 
-import type { Agent, AgentFile } from "@/lib/types"
+import type { Agent, AgentFile, AgentResource, Tag } from "@/lib/types"
+import type { PublishValidation } from "@/app/actions/agent"
+import { updateAgentReadme } from "@/app/actions/agent"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -30,12 +41,24 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+import { AgentDeleteButton } from "./agent-delete-button"
+import { AgentLicenseSelect } from "./agent-license-select"
+import { AgentPriceEditor } from "./agent-price-editor"
+import { AgentProfileImage } from "./agent-profile-image"
+import { AgentResourceUpload } from "./agent-resource-upload"
+import { AgentTagManager } from "./agent-tag-manager"
 import { MarkdownRenderer } from "./markdown-renderer"
+
+const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false })
 
 interface AgentDetailTabsProps {
   agent: Agent
   files: AgentFile[]
   isOwner: boolean
+  resources?: AgentResource[]
+  allTags?: Tag[]
+  selectedTagIds?: string[]
+  profileUsername?: string
 }
 
 interface TreeEntry {
@@ -86,12 +109,48 @@ function isMarkdownFile(path: string): boolean {
   return /\.(md|mdx|markdown)$/i.test(path)
 }
 
-function ReadmeTab({ readme, files }: { readme?: string | null; files: AgentFile[] }) {
+function ReadmeTab({
+  readme,
+  files,
+  isOwner,
+  agentId,
+  profileUsername,
+}: {
+  readme?: string | null
+  files: AgentFile[]
+  isOwner: boolean
+  agentId: string
+  profileUsername: string
+}) {
+  const router = useRouter()
+  const [isEditing, setIsEditing] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
   const readmeContent =
     readme ||
     files.find((f) => /^readme\.md$/i.test(f.path))?.content
 
-  if (!readmeContent) {
+  const [draft, setDraft] = useState(readmeContent ?? "")
+
+  const handleSave = () => {
+    startTransition(async () => {
+      const result = await updateAgentReadme(agentId, draft, profileUsername)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success("README updated")
+        setIsEditing(false)
+        router.refresh()
+      }
+    })
+  }
+
+  const handleCancel = () => {
+    setDraft(readmeContent ?? "")
+    setIsEditing(false)
+  }
+
+  if (!readmeContent && !isOwner) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
         <BookOpen className="mb-3 size-10 opacity-40" />
@@ -100,15 +159,83 @@ function ReadmeTab({ readme, files }: { readme?: string | null; files: AgentFile
     )
   }
 
+  if (!readmeContent && isOwner && !isEditing) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+        <BookOpen className="mb-1 size-10 opacity-40" />
+        <p className="text-sm">No README yet.</p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setIsEditing(true)}
+        >
+          <Pencil className="mr-2 size-3.5" />
+          Write README
+        </Button>
+      </div>
+    )
+  }
+
+  if (isEditing) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 px-4 py-3">
+          <BookOpen className="size-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Edit README.md</CardTitle>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancel}
+              disabled={isPending}
+            >
+              <X className="mr-1 size-3.5" />
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 size-3.5 animate-spin" />}
+              Save
+            </Button>
+          </div>
+        </CardHeader>
+        <Separator />
+        <CardContent className="p-0">
+          <div data-color-mode="dark">
+            <MDEditor
+              value={draft}
+              onChange={(val) => setDraft(val ?? "")}
+              height={500}
+              preview="live"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center gap-2 px-4 py-3">
         <BookOpen className="size-4 text-muted-foreground" />
         <CardTitle className="text-sm font-medium">README.md</CardTitle>
+        {isOwner && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => {
+              setDraft(readmeContent ?? "")
+              setIsEditing(true)
+            }}
+          >
+            <Pencil className="mr-1 size-3.5" />
+            Edit
+          </Button>
+        )}
       </CardHeader>
       <Separator />
       <CardContent className="p-6">
-        <MarkdownRenderer content={readmeContent} />
+        <MarkdownRenderer content={readmeContent!} />
       </CardContent>
     </Card>
   )
@@ -457,10 +584,84 @@ function OverviewTab({ agent, isOwner }: { agent: Agent; isOwner: boolean }) {
   )
 }
 
+function SettingsTab({
+  agent,
+  profileUsername,
+}: {
+  agent: Agent
+  profileUsername: string
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2">
+        <AgentProfileImage
+          agentId={agent.id}
+          currentImageUrl={agent.profile_image_url}
+          profileUsername={profileUsername}
+        />
+        <AgentLicenseSelect
+          agentId={agent.id}
+          currentLicense={agent.license}
+          profileUsername={profileUsername}
+        />
+        <AgentPriceEditor
+          agentId={agent.id}
+          currentPriceCents={agent.price_cents ?? 0}
+          currency={agent.currency ?? "usd"}
+          profileUsername={profileUsername}
+        />
+      </div>
+      <div className="border-t pt-6">
+        <AgentDeleteButton
+          agentId={agent.id}
+          agentName={agent.name}
+          profileUsername={profileUsername}
+        />
+      </div>
+    </div>
+  )
+}
+
+function MarketplaceTab({
+  agent,
+  resources,
+  allTags,
+  selectedTagIds,
+  profileUsername,
+}: {
+  agent: Agent
+  resources: AgentResource[]
+  allTags: Tag[]
+  selectedTagIds: string[]
+  profileUsername: string
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <AgentTagManager
+        agentId={agent.id}
+        allTags={allTags}
+        selectedTagIds={selectedTagIds}
+        profileUsername={profileUsername}
+      />
+      <div className="md:col-span-2">
+        <AgentResourceUpload
+          agentId={agent.id}
+          resources={resources}
+          profileUsername={profileUsername}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function AgentDetailTabs({
   agent,
   files,
   isOwner,
+  resources = [],
+  allTags = [],
+  selectedTagIds = [],
+  profileUsername = "",
 }: AgentDetailTabsProps) {
   const readmeFile = files.find((f) => /^readme\.md$/i.test(f.path))
   const hasReadme = !!(agent.readme || readmeFile?.content)
@@ -480,10 +681,28 @@ export function AgentDetailTabs({
           <Settings2 className="size-3.5" />
           Overview
         </TabsTrigger>
+        {isOwner && (
+          <>
+            <TabsTrigger value="settings" className="gap-1.5">
+              <Wrench className="size-3.5" />
+              Settings
+            </TabsTrigger>
+            <TabsTrigger value="marketplace" className="gap-1.5">
+              <ShoppingBag className="size-3.5" />
+              Marketplace
+            </TabsTrigger>
+          </>
+        )}
       </TabsList>
 
       <TabsContent value="readme">
-        <ReadmeTab readme={agent.readme} files={files} />
+        <ReadmeTab
+          readme={agent.readme}
+          files={files}
+          isOwner={isOwner}
+          agentId={agent.id}
+          profileUsername={profileUsername}
+        />
       </TabsContent>
 
       <TabsContent value="content">
@@ -493,6 +712,24 @@ export function AgentDetailTabs({
       <TabsContent value="overview">
         <OverviewTab agent={agent} isOwner={isOwner} />
       </TabsContent>
+
+      {isOwner && profileUsername && (
+        <>
+          <TabsContent value="settings">
+            <SettingsTab agent={agent} profileUsername={profileUsername} />
+          </TabsContent>
+
+          <TabsContent value="marketplace">
+            <MarketplaceTab
+              agent={agent}
+              resources={resources}
+              allTags={allTags}
+              selectedTagIds={selectedTagIds}
+              profileUsername={profileUsername}
+            />
+          </TabsContent>
+        </>
+      )}
     </Tabs>
   )
 }

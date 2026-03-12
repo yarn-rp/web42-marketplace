@@ -7,7 +7,7 @@ import { createClient } from "@/db/supabase/server"
 import type { Category, Tag } from "@/lib/types"
 
 export const getCachedCategories = cache(async (): Promise<Category[]> => {
-  const db = createClient()
+  const db = await createClient()
   const { data, error } = await db
     .from("categories")
     .select("*")
@@ -22,7 +22,7 @@ export const getCachedCategories = cache(async (): Promise<Category[]> => {
 })
 
 export const getCachedTags = cache(async (): Promise<Tag[]> => {
-  const db = createClient()
+  const db = await createClient()
   const { data, error } = await db.from("tags").select("*").order("name")
 
   if (error) {

@@ -33,6 +33,10 @@ export function AgentCard({
   const username = owner?.username ?? "unknown"
   const href = `/${username}/${agent.slug}`
   const primaryCategory = agent.categories?.[0]
+  const sortedResources = [...(agent.resources ?? [])].sort(
+    (a, b) => a.sort_order - b.sort_order
+  )
+  const thumbnail = sortedResources[0]
 
   return (
     <motion.div
@@ -43,13 +47,22 @@ export function AgentCard({
     >
       <Link href={href} className="group block">
         <Card className="overflow-hidden transition-colors hover:bg-accent/50">
-          {agent.cover_image_url && (
+          {thumbnail && (
             <div className="relative aspect-[16/9] w-full overflow-hidden">
-              <img
-                src={agent.cover_image_url}
-                alt={agent.name}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
+              {thumbnail.type === "video" ? (
+                <video
+                  src={thumbnail.url}
+                  muted
+                  preload="metadata"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <img
+                  src={thumbnail.url}
+                  alt={agent.name}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              )}
               <div className="absolute right-3 top-3 flex gap-1.5">
                 {showPrice && (
                   <AgentPriceBadge

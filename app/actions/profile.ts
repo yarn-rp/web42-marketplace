@@ -9,7 +9,7 @@ import type { Profile } from "@/lib/types"
 
 export const getProfile = cache(
   async (username: string): Promise<Profile | null> => {
-    const db = createClient()
+    const db = await createClient()
     const { data, error } = await db
       .from("users")
       .select("*")
@@ -26,7 +26,7 @@ export const getProfile = cache(
 )
 
 export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -48,7 +48,7 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
 })
 
 export async function updateProfile(formData: FormData) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -76,7 +76,7 @@ export async function updateProfile(formData: FormData) {
 }
 
 export async function updateProfileReadme(readme: string) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()

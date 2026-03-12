@@ -23,7 +23,7 @@ function flattenAgentRelations(row: Record<string, any>) {
 }
 
 async function hydrateRemixSource(
-  db: ReturnType<typeof createClient>,
+  db: Awaited<ReturnType<typeof createClient>>,
   agents: Record<string, any>[]
 ): Promise<void> {
   const remixIds = agents
@@ -69,10 +69,10 @@ export const getAgents = cache(
     tag?: string,
     sort: SortOption = "trending"
   ) => {
-    const db = createClient()
+    const db = await createClient()
     let query = db
       .from("agents")
-      .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon))")
+      .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), resources:agent_resources(id, url, type, sort_order)")
       .eq("visibility", "public")
 
     if (search) {
@@ -148,10 +148,10 @@ export const getAgents = cache(
 )
 
 export const getFeaturedAgents = cache(async () => {
-  const db = createClient()
+  const db = await createClient()
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon))")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), resources:agent_resources(id, url, type, sort_order)")
     .eq("featured", true)
     .eq("visibility", "public")
     .order("stars_count", { ascending: false })
@@ -167,7 +167,7 @@ export const getFeaturedAgents = cache(async () => {
 
 export const getAgentBySlug = cache(
   async (ownerUsername: string, agentSlug: string) => {
-    const db = createClient()
+    const db = await createClient()
 
     const { data: owner } = await db
       .from("users")
@@ -198,6 +198,7 @@ export const getAgentBySlug = cache(
     } = await db.auth.getUser()
 
     let hasStarred = false
+    let hasAccess = false
     if (user) {
       const { data: star } = await db
         .from("stars")
@@ -206,18 +207,25 @@ export const getAgentBySlug = cache(
         .eq("agent_id", data.id)
         .maybeSingle()
       hasStarred = !!star
+
+      const { data: access } = await db.rpc("has_agent_access", {
+        p_user_id: user.id,
+        p_agent_id: data.id,
+      })
+      hasAccess = access === true
     }
 
     return {
       ...flattenAgentRelations(data),
       remixed_from: data.remixed_from ?? null,
       has_starred: hasStarred,
+      has_access: hasAccess,
     } as Agent
   }
 )
 
 export const getAgentsByUser = cache(async (username: string) => {
-  const db = createClient()
+  const db = await createClient()
 
   const { data: owner } = await db
     .from("users")
@@ -244,7 +252,7 @@ export const getAgentsByUser = cache(async (username: string) => {
 })
 
 export const getMyAgents = cache(async () => {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -268,7 +276,7 @@ export const getMyAgents = cache(async () => {
 })
 
 export async function starAgent(agentId: string) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -289,7 +297,7 @@ export async function starAgent(agentId: string) {
 }
 
 export async function unstarAgent(agentId: string) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -312,12 +320,15 @@ export async function unstarAgent(agentId: string) {
 }
 
 export async function remixAgent(agentId: string) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
 
   if (!user) return { error: "Not authenticated" }
+
+  const accessGranted = await hasAgentAccess(agentId)
+  if (!accessGranted) return { error: "Access required. Please get the agent first." }
 
   const { data: original, error: fetchError } = await db
     .from("agents")
@@ -377,12 +388,66 @@ export async function remixAgent(agentId: string) {
 }
 
 export async function incrementInstallCount(agentId: string) {
-  const db = createClient()
+  const db = await createClient()
   await db.rpc("increment_install_count", { p_agent_id: agentId })
 }
 
+// ============================================================
+// Agent access / entitlement
+// ============================================================
+
+export async function hasAgentAccess(agentId: string): Promise<boolean> {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return false
+
+  const { data } = await db.rpc("has_agent_access", {
+    p_user_id: user.id,
+    p_agent_id: agentId,
+  })
+
+  return data === true
+}
+
+export async function acquireAgent(agentId: string) {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { data: agent } = await db
+    .from("agents")
+    .select("price_cents")
+    .eq("id", agentId)
+    .single()
+
+  if (!agent) return { error: "Agent not found" }
+
+  const { error } = await db.from("agent_access").insert({
+    user_id: user.id,
+    agent_id: agentId,
+    price_cents_at_acquisition: agent.price_cents ?? 0,
+  })
+
+  if (error) {
+    if (error.code === "23505") {
+      return { success: true }
+    }
+    console.error("Error acquiring agent:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath("/")
+  return { success: true }
+}
+
 export const getMyAgentBySlug = cache(async (slug: string) => {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -405,7 +470,7 @@ export const getMyAgentBySlug = cache(async (slug: string) => {
 })
 
 export const getAgentFiles = cache(async (agentId: string) => {
-  const db = createClient()
+  const db = await createClient()
   const { data, error } = await db
     .from("agent_files")
     .select("*")
@@ -425,7 +490,7 @@ export async function toggleAgentVisibility(
   visibility: AgentVisibility,
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -452,7 +517,7 @@ export async function deleteAgent(
   agentId: string,
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -490,7 +555,7 @@ export async function updateAgentPrice(
   priceCents: number,
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -528,7 +593,7 @@ export interface PublishValidation {
 export async function getPublishValidation(
   agentId: string
 ): Promise<PublishValidation> {
-  const db = createClient()
+  const db = await createClient()
 
   const { data: agent } = await db
     .from("agents")
@@ -559,7 +624,7 @@ export async function getPublishValidation(
 }
 
 export async function publishAgent(agentId: string, profileUsername: string) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -600,7 +665,7 @@ export async function publishAgent(agentId: string, profileUsername: string) {
 }
 
 export async function unpublishAgent(agentId: string, profileUsername: string) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -629,7 +694,7 @@ export async function unpublishAgent(agentId: string, profileUsername: string) {
 // ============================================================
 
 export const getAgentResources = cache(async (agentId: string) => {
-  const db = createClient()
+  const db = await createClient()
   const { data, error } = await db
     .from("agent_resources")
     .select("*")
@@ -655,7 +720,7 @@ export async function createAgentResource(
   },
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -694,7 +759,7 @@ export async function deleteAgentResource(
   resourceId: string,
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -720,7 +785,7 @@ export async function reorderAgentResources(
   orderedIds: string[],
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -751,12 +816,39 @@ export async function reorderAgentResources(
 // Agent metadata updates (profile image, license, tags)
 // ============================================================
 
+export async function updateAgentReadme(
+  agentId: string,
+  readme: string,
+  profileUsername: string
+) {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { error } = await db
+    .from("agents")
+    .update({ readme })
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error updating agent readme:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
+
 export async function updateAgentProfileImage(
   agentId: string,
   profileImageUrl: string | null,
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -783,7 +875,7 @@ export async function updateAgentLicense(
   license: AgentLicense | null,
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()
@@ -810,7 +902,7 @@ export async function updateAgentTags(
   tagIds: string[],
   profileUsername: string
 ) {
-  const db = createClient()
+  const db = await createClient()
   const {
     data: { user },
   } = await db.auth.getUser()

@@ -5,7 +5,7 @@ import { authenticateRequest } from "@/lib/auth/cli-auth"
 
 // GET /api/agents - list agents
 export async function GET(request: Request) {
-  const db = createClient()
+  const db = await createClient()
   const url = new URL(request.url)
   const search = url.searchParams.get("search")
   const username = url.searchParams.get("username")

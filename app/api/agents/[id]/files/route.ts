@@ -13,9 +13,28 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const db = createClient()
+  const db = await createClient()
   const url = new URL(request.url)
   const includeContent = url.searchParams.get("include_content") === "true"
+
+  if (includeContent) {
+    const auth = await authenticateRequest(request)
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: hasAccess } = await supabaseAdmin.rpc("has_agent_access", {
+      p_user_id: auth.userId,
+      p_agent_id: params.id,
+    })
+
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "Access required. Please get the agent first." },
+        { status: 403 }
+      )
+    }
+  }
 
   const selectFields = includeContent
     ? "*"

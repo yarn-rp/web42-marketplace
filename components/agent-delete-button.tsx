@@ -45,7 +45,7 @@ export function AgentDeleteButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-destructive hover:text-destructive">
+        <Button variant="destructive" size="sm" className="h-8 gap-1.5 px-2">
           <Trash2 className="size-3.5" />
           <span className="text-xs">Delete</span>
         </Button>

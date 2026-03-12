@@ -19,9 +19,14 @@ import { remixAgent } from "@/app/actions/agent"
 interface RemixButtonProps {
   agentId: string
   agentName: string
+  variant?: "default" | "outline" | "secondary"
 }
 
-export function RemixButton({ agentId, agentName }: RemixButtonProps) {
+export function RemixButton({
+  agentId,
+  agentName,
+  variant = "default",
+}: RemixButtonProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -49,7 +54,7 @@ export function RemixButton({ agentId, agentName }: RemixButtonProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5">
+        <Button variant={variant} size="sm" className="gap-1.5">
           <GitFork className="size-4" />
           Remix
         </Button>

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const cliCode = requestUrl.searchParams.get("cli_code")
 
   if (code) {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const { data } = await supabase.auth.exchangeCodeForSession(code)
 
     if (cliCode && data.user) {

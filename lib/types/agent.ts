@@ -59,6 +59,14 @@ export interface Agent {
   tags?: Tag[]
   resources?: AgentResource[]
   has_starred?: boolean
+  has_access?: boolean
+}
+
+export interface AgentAccess {
+  user_id: string
+  agent_id: string
+  price_cents_at_acquisition: number
+  created_at: string
 }
 
 export interface AgentVersion {
