@@ -59,10 +59,12 @@ export async function updateProfile(formData: FormData) {
   const fullName = formData.get("full_name")
   const bio = formData.get("bio")
   const website = formData.get("website")
+  const profileReadme = formData.get("profile_readme")
 
   if (typeof fullName === "string") updates.full_name = fullName
   if (typeof bio === "string") updates.bio = bio
   if (typeof website === "string") updates.website = website
+  if (typeof profileReadme === "string") updates.profile_readme = profileReadme
 
   const { error } = await db.from("users").update(updates).eq("id", user.id)
 

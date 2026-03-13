@@ -14,7 +14,6 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { ProfileAgentGrid } from "@/components/profile-agent-grid"
-import { ProfileReadmeEditor } from "@/components/profile-readme-editor"
 import { SellerDashboard } from "@/components/seller-dashboard"
 import { StripeConnectButton } from "@/components/stripe-connect-button"
 
@@ -24,6 +23,19 @@ interface ProfileTabsProps {
   sellerOrders: Order[]
   isOwner: boolean
   profileUsername: string
+}
+
+function AboutSection({ content }: { content: string | null }) {
+  if (!content) return null
+
+  return (
+    <section className="mb-8">
+      <h2 className="mb-4 text-lg font-semibold">About</h2>
+      <div className="rounded-lg border bg-muted/30 p-6">
+        <MarkdownRenderer content={content} />
+      </div>
+    </section>
+  )
 }
 
 export function ProfileTabs({
@@ -39,14 +51,7 @@ export function ProfileTabs({
   if (!isOwner) {
     return (
       <>
-        {profile.profile_readme && (
-          <section className="mb-8">
-            <h2 className="mb-4 text-lg font-semibold">About</h2>
-            <div className="rounded-lg border bg-muted/30 p-6">
-              <MarkdownRenderer content={profile.profile_readme} />
-            </div>
-          </section>
-        )}
+        <AboutSection content={profile.profile_readme} />
 
         <section>
           <h2 className="mb-4 text-lg font-semibold">Published Agents</h2>
@@ -68,11 +73,7 @@ export function ProfileTabs({
       </TabsList>
 
       <TabsContent value="overview" className="mt-6 space-y-8">
-        <section>
-          <ProfileReadmeEditor
-            initialContent={profile.profile_readme ?? ""}
-          />
-        </section>
+        <AboutSection content={profile.profile_readme} />
 
         <section>
           <h2 className="mb-4 text-lg font-semibold">Your Agents</h2>

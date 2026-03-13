@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { MarkdownRenderer } from "@/components/markdown-renderer"
 
 interface ProfileEditDialogProps {
   profile: Profile
@@ -28,8 +31,10 @@ export function ProfileEditDialog({ profile }: ProfileEditDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [readme, setReadme] = useState(profile.profile_readme ?? "")
 
   const handleSubmit = (formData: FormData) => {
+    formData.set("profile_readme", readme)
     startTransition(async () => {
       const result = await updateProfile(formData)
       if (result?.error) {
@@ -50,7 +55,7 @@ export function ProfileEditDialog({ profile }: ProfileEditDialogProps) {
           Edit Profile
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Profile</DialogTitle>
           <DialogDescription>
@@ -82,16 +87,6 @@ export function ProfileEditDialog({ profile }: ProfileEditDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-bio">Bio</Label>
-            <Input
-              id="edit-bio"
-              name="bio"
-              defaultValue={profile.bio ?? ""}
-              placeholder="Tell us about yourself"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="edit-website">Website</Label>
             <Input
               id="edit-website"
@@ -99,6 +94,36 @@ export function ProfileEditDialog({ profile }: ProfileEditDialogProps) {
               defaultValue={profile.website ?? ""}
               placeholder="https://yoursite.com"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>About</Label>
+            <Tabs defaultValue="edit">
+              <TabsList className="h-8">
+                <TabsTrigger value="edit" className="text-xs">Edit</TabsTrigger>
+                <TabsTrigger value="preview" className="text-xs">Preview</TabsTrigger>
+              </TabsList>
+              <TabsContent value="edit" className="mt-2">
+                <Textarea
+                  value={readme}
+                  onChange={(e) => setReadme(e.target.value)}
+                  placeholder="Tell others about yourself. Supports Markdown."
+                  className="min-h-[160px] font-mono text-sm"
+                  rows={8}
+                />
+              </TabsContent>
+              <TabsContent value="preview" className="mt-2">
+                <div className="rounded-lg border bg-muted/30 p-4 min-h-[160px]">
+                  {readme ? (
+                    <MarkdownRenderer content={readme} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Nothing to preview yet.
+                    </p>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <DialogFooter>
