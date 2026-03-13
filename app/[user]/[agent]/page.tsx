@@ -8,6 +8,7 @@ import {
   getAgentResources,
   getPublishValidation,
 } from "@/app/actions/agent"
+import { getOrderForAgent } from "@/app/actions/stripe"
 import { getCachedTags } from "@/app/actions/filters"
 import { getCurrentProfile } from "@/app/actions/profile"
 
@@ -29,18 +30,19 @@ export default async function AgentPage({
   const hasAccess = agent.has_access ?? isOwner
   const profileUsername = agent.owner?.username ?? username
 
-  const [agentFiles, resources, validation, allTags] = await Promise.all([
+  const [agentFiles, resources, validation, allTags, order] = await Promise.all([
     getAgentFiles(agent.id),
     getAgentResources(agent.id),
     isOwner ? getPublishValidation(agent.id) : null,
     isOwner ? getCachedTags() : [],
+    hasAccess && !isOwner ? getOrderForAgent(agent.id) : null,
   ])
 
   const selectedTagIds = (agent.tags ?? []).map((t) => t.id)
 
   return (
     <div className="z-10">
-      <div className="relative mx-auto w-full max-w-6xl py-4">
+      <div className="relative mx-auto w-full max-w-7xl px-4 py-4 sm:px-6">
         <FadeIn>
           <AgentShowcase
             agent={agent}
@@ -53,6 +55,7 @@ export default async function AgentPage({
             allTags={allTags}
             selectedTagIds={selectedTagIds}
             profileUsername={profileUsername}
+            order={order}
           />
         </FadeIn>
       </div>

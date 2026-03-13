@@ -7,5 +7,8 @@ export interface Profile {
   website: string | null
   github_handle: string | null
   profile_readme: string | null
+  stripe_account_id: string | null
+  stripe_onboarding_complete: boolean
+  stripe_payouts_enabled: boolean
   created_at: string
 }

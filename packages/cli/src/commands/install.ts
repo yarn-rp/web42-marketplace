@@ -92,6 +92,7 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
           Array<{
             id: string
             slug: string
+            price_cents: number
             owner: { username: string }
           }>
         >(`/api/agents?username=${username}`)
@@ -102,10 +103,31 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
           process.exit(1)
         }
 
-        const result = await apiPost<MarketplaceInstallResult>(
-          `/api/agents/${agent.id}/install`,
-          {}
-        )
+        let result: MarketplaceInstallResult
+        try {
+          result = await apiPost<MarketplaceInstallResult>(
+            `/api/agents/${agent.id}/install`,
+            {}
+          )
+        } catch (err: any) {
+          if (
+            err.message?.includes("Access required") &&
+            agent.price_cents > 0
+          ) {
+            const siteUrl =
+              process.env.WEB42_API_URL ?? "https://marketplace.web42.ai"
+            spinner.fail(
+              `This is a paid agent ($${(agent.price_cents / 100).toFixed(2)}). Purchase it on the web first:`
+            )
+            console.log(
+              chalk.cyan(
+                `  ${siteUrl}/${username}/${agentSlug}`
+              )
+            )
+            process.exit(1)
+          }
+          throw err
+        }
 
         const manifest = result.agent.manifest
         let configAnswers: Record<string, string> = {}

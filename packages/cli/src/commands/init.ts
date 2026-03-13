@@ -1,10 +1,16 @@
-import { writeFileSync, existsSync, readdirSync } from "fs"
+import {
+  writeFileSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+} from "fs"
 import { join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
 import inquirer from "inquirer"
 
 import { requireAuth } from "../utils/config.js"
+import { parseSkillMd } from "../utils/skill.js"
 import {
   AGENTS_MD,
   IDENTITY_MD,
@@ -15,25 +21,29 @@ import {
   INIT_BOOTSTRAP_MD,
 } from "../platforms/openclaw/templates.js"
 
-function detectWorkspaceSkills(cwd: string): string[] {
+function detectWorkspaceSkills(
+  cwd: string
+): Array<{ name: string; description: string }> {
   const skillsDir = join(cwd, "skills")
   if (!existsSync(skillsDir)) return []
 
-  const skills: string[] = []
+  const skills: Array<{ name: string; description: string }> = []
   try {
     const entries = readdirSync(skillsDir, { withFileTypes: true })
     for (const entry of entries) {
       if (entry.isDirectory()) {
         const skillMd = join(skillsDir, entry.name, "SKILL.md")
         if (existsSync(skillMd)) {
-          skills.push(entry.name)
+          const content = readFileSync(skillMd, "utf-8")
+          const parsed = parseSkillMd(content, entry.name)
+          skills.push(parsed)
         }
       }
     }
   } catch {
     // ignore read errors
   }
-  return skills.sort()
+  return skills.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 const CATEGORIES = [
@@ -120,16 +130,6 @@ export const initCommand = new Command("init")
       },
       {
         type: "input",
-        name: "channels",
-        message: "Supported channels (comma-separated, e.g. discord,slack,web):",
-        filter: (val: string) =>
-          val
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean),
-      },
-      {
-        type: "input",
         name: "primaryModel",
         message: "Primary model preference (e.g. claude-sonnet-4-20250514):",
         default: "",
@@ -146,7 +146,7 @@ export const initCommand = new Command("init")
     if (detectedSkills.length > 0) {
       console.log(
         chalk.dim(
-          `  Detected ${detectedSkills.length} skill(s): ${detectedSkills.join(", ")}`
+          `  Detected ${detectedSkills.length} skill(s): ${detectedSkills.map((s) => s.name).join(", ")}`
         )
       )
     }
@@ -158,7 +158,6 @@ export const initCommand = new Command("init")
       description: answers.description,
       version: answers.version,
       author: config.username,
-      channels: answers.channels,
       skills: detectedSkills,
       plugins: [] as string[],
       modelPreferences: answers.primaryModel

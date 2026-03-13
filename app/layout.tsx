@@ -1,6 +1,6 @@
 import "./globals.css"
 import { ReactNode } from "react"
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google"
+import { Plus_Jakarta_Sans, JetBrains_Mono, Silkscreen } from "next/font/google"
 
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -19,24 +19,30 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
 })
 
+const silkscreen = Silkscreen({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-pixel",
+})
+
 const defaultUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL
   : "http://localhost:3000"
 
 export const metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Web42 Agent Marketplace",
+  title: "Web42 — The AI Agent Marketplace",
   description:
-    "Discover, remix, and install agent packages. Share your exact agent setup so others can have exactly what you have.",
+    "Install expert-built AI agents in seconds or publish your own and earn. Platform-native agents for OpenClaw and more.",
   keywords:
-    "AI Agents, Agent Marketplace, CLI, Web42, Agent Packages",
+    "AI Agents, Agent Marketplace, CLI, Web42, OpenClaw, Install Agents, Publish Agents",
   icons: {
     icon: "/icon.svg",
   },
   openGraph: {
-    title: "Web42 Agent Marketplace",
+    title: "Web42 — The AI Agent Marketplace",
     description:
-      "Discover, remix, and install agent packages. Share your exact agent setup so others can have exactly what you have.",
+      "Install expert-built AI agents in seconds or publish your own and earn. Platform-native agents for OpenClaw and more.",
     type: "website",
   },
   twitter: {
@@ -48,7 +54,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const profile = await getCurrentProfile()
 
   return (
-    <html lang="en" className={`${plusJakarta.variable} ${jetbrainsMono.variable} font-sans`}>
+    <html lang="en" className={`${plusJakarta.variable} ${jetbrainsMono.variable} ${silkscreen.variable} font-sans`}>
       <body>
         <ThemeProvider
           attribute="class"

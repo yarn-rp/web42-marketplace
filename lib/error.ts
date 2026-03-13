@@ -1,6 +1,13 @@
-import { isRedirectError } from "next/dist/client/components/redirect"
 import { toast } from "sonner"
 import { z } from "zod"
+
+function isRedirectError(err: unknown): boolean {
+  if (err instanceof Error && "digest" in err) {
+    const digest = (err as Error & { digest?: string }).digest
+    return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")
+  }
+  return false
+}
 
 export function getErrorMessage(err: unknown) {
   const unknownError = "Something went wrong, please try again later."

@@ -71,7 +71,15 @@ export async function updateProfile(formData: FormData) {
     return { error: error.message }
   }
 
-  revalidatePath("/settings")
+  const { data: prof } = await db
+    .from("users")
+    .select("username")
+    .eq("id", user.id)
+    .single()
+
+  if (prof?.username) {
+    revalidatePath(`/${prof.username}`)
+  }
   return { success: true }
 }
 

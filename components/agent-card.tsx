@@ -5,6 +5,8 @@ import { motion } from "framer-motion"
 import { Download, GitFork, Star } from "lucide-react"
 
 import type { Agent } from "@/lib/types"
+import { getPlatform } from "@/lib/platforms"
+import { PlatformLogo } from "@/components/platform-logo"
 import { cn } from "@/lib/utils"
 import { AgentPriceBadge } from "@/components/agent-price-badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -33,6 +35,7 @@ export function AgentCard({
   const username = owner?.username ?? "unknown"
   const href = `/${username}/${agent.slug}`
   const primaryCategory = agent.categories?.[0]
+  const platformInfo = getPlatform(agent.manifest?.platform)
   const sortedResources = [...(agent.resources ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order
   )
@@ -44,6 +47,8 @@ export function AgentCard({
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
       <Link href={href} className="group block">
         <Card className="overflow-hidden transition-colors hover:bg-accent/50">
@@ -126,6 +131,11 @@ export function AgentCard({
           </CardContent>
 
           <CardFooter className="flex items-center gap-3 px-4 pb-4 pt-2 font-mono text-xs text-muted-foreground">
+            {platformInfo && (
+              <span className="flex items-center gap-1" title={platformInfo.name}>
+                <PlatformLogo platform={platformInfo} size={16} className="rounded-sm" />
+              </span>
+            )}
             <span className="flex items-center gap-1">
               <Star className="size-3" />
               {agent.stars_count}

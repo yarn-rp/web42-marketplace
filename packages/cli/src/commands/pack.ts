@@ -5,6 +5,7 @@ import chalk from "chalk"
 import ora from "ora"
 
 import { openclawAdapter } from "../platforms/openclaw/adapter.js"
+import { parseSkillMd } from "../utils/skill.js"
 
 export const packCommand = new Command("pack")
   .description("Pack your agent workspace into a distributable artifact")
@@ -38,13 +39,18 @@ export const packCommand = new Command("pack")
       const result = await openclawAdapter.pack({ cwd, outputDir: opts.output })
 
       // Detect skills from packed files (skills/*/SKILL.md pattern)
-      const detectedSkills = new Set<string>()
+      const detectedSkills: Array<{ name: string; description: string }> = []
       for (const f of result.files) {
         const match = f.path.match(/^skills\/([^/]+)\/SKILL\.md$/)
-        if (match) detectedSkills.add(match[1])
+        if (match) {
+          const parsed = parseSkillMd(f.content, match[1])
+          detectedSkills.push(parsed)
+        }
       }
-      if (detectedSkills.size > 0) {
-        manifest.skills = [...detectedSkills].sort()
+      if (detectedSkills.length > 0) {
+        manifest.skills = detectedSkills.sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
       }
 
       // Merge auto-generated config variables into manifest

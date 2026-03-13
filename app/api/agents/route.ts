@@ -16,9 +16,10 @@ export async function GET(request: Request) {
     .eq("visibility", "public")
 
   if (search) {
-    query = query.or(
-      `name.ilike.%${search}%,description.ilike.%${search}%,slug.ilike.%${search}%`
-    )
+    query = query.textSearch("search_vector", search, {
+      type: "websearch",
+      config: "english",
+    })
   }
 
   if (username) {
@@ -66,6 +67,10 @@ export async function POST(request: Request) {
       { error: "slug and name are required" },
       { status: 400 }
     )
+  }
+
+  if (manifest && !manifest.platform) {
+    manifest.platform = "openclaw"
   }
 
   const { data: existing } = await adminDb

@@ -1,4 +1,5 @@
 import { LogoAnimationLink } from "@/components/nav"
+import { LoginHero } from "@/components/login-hero"
 
 import { LoginForm } from "./form"
 
@@ -8,15 +9,18 @@ export default async function LoginPage({
   searchParams: { message: string }
 }) {
   return (
-    <div>
-      <div className="absolute top-2 left-2">
-        <LogoAnimationLink />
-      </div>
-      <div className="w-full flex flex-col items-center justify-center gap-2 pt-24">
+    <div className="grid min-h-screen lg:grid-cols-2">
+      <LoginHero />
+
+      <div className="flex flex-col items-center justify-center px-4 py-12">
+        <div className="absolute left-4 top-4 lg:hidden">
+          <LogoAnimationLink />
+        </div>
+
         <LoginForm />
 
         {searchParams?.message && (
-          <p className="mt-4 p-4 bg-foreground/10 text-foreground text-center rounded-md text-sm">
+          <p className="mt-4 max-w-sm rounded-md bg-foreground/10 p-4 text-center text-sm text-foreground">
             {searchParams.message}
           </p>
         )}

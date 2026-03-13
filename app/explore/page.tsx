@@ -1,15 +1,15 @@
-import { ReactElement } from "react"
-import { Terminal } from "lucide-react"
+import { ReactElement, Suspense } from "react"
 
 import { Separator } from "@/components/ui/separator"
 import { FadeIn } from "@/components/cult/fade-in"
 import { GradientHeading } from "@/components/cult/gradient-heading"
-import { AgentCard } from "@/components/agent-card"
+import { AgentResults } from "@/components/agent-results"
+import { AgentResultsSkeleton } from "@/components/agent-results-skeleton"
 import { AgentSearch } from "@/components/agent-search"
-import { CategoryPill } from "@/components/category-pill"
+import { ExploreFilters } from "@/components/explore-filters"
 import { SortSelect } from "@/components/sort-select"
 import { getCachedCategories } from "../actions/filters"
-import { getAgents, type SortOption } from "../actions/agent"
+import type { SortOption } from "../actions/agent"
 
 export const dynamic = "force-dynamic"
 
@@ -21,18 +21,20 @@ export default async function ExplorePage({
     category?: string
     tag?: string
     sort?: SortOption
+    platform?: string
   }
 }): Promise<ReactElement> {
-  const { search, category, tag, sort } = searchParams
-  const agents = await getAgents(search, category, tag, sort)
+  const { search, category, tag, sort, platform } = searchParams
   const categories = await getCachedCategories()
 
-  const hasFilter = search || category || tag
+  const hasFilter = search || category || tag || platform
+
+  const suspenseKey = JSON.stringify({ search, category, tag, sort, platform })
 
   return (
     <div className="w-full">
       <FadeIn>
-        <div className="mx-auto max-w-6xl px-6 pt-8 pb-4">
+        <div className="mx-auto max-w-7xl px-4 pt-8 pb-4 sm:px-6">
           {hasFilter ? (
             <div className="mb-6">
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
@@ -55,50 +57,25 @@ export default async function ExplorePage({
             <div className="max-w-md flex-1">
               <AgentSearch />
             </div>
-            <SortSelect current={sort} />
-          </div>
-
-          {categories.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-6">
-              <CategoryPill
-                category={{ id: "all", name: "All", icon: null, created_at: "" }}
-                active={!category}
-              />
-              {categories.map((cat) => (
-                <CategoryPill
-                  key={cat.id}
-                  category={cat}
-                  active={category === cat.name}
-                />
-              ))}
+            <div className="flex items-center gap-2">
+              <ExploreFilters categories={categories} />
+              <SortSelect current={sort} />
             </div>
-          )}
+          </div>
 
           <Separator className="mb-8" />
         </div>
 
-        <div className="mx-auto max-w-6xl px-6 pb-16">
-          {agents.length === 0 ? (
-            <div className="flex flex-col items-center rounded-xl border border-dashed p-12 text-center">
-              <Terminal className="size-10 mb-4 text-muted-foreground/50" />
-              <h3 className="text-lg font-medium mb-2">
-                {hasFilter
-                  ? "No agents match your filters"
-                  : "No agents yet"}
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                {hasFilter
-                  ? "Try a different search term or category."
-                  : "Be the first to publish an agent package."}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {agents.map((agent, i) => (
-                <AgentCard key={agent.id} agent={agent} order={i} showPrice />
-              ))}
-            </div>
-          )}
+        <div className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
+          <Suspense key={suspenseKey} fallback={<AgentResultsSkeleton />}>
+            <AgentResults
+              search={search}
+              category={category}
+              tag={tag}
+              sort={sort}
+              platform={platform}
+            />
+          </Suspense>
         </div>
       </FadeIn>
     </div>

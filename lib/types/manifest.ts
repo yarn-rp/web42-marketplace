@@ -9,6 +9,7 @@ const configVariableSchema = z.object({
 })
 
 export const manifestSchema = z.object({
+  platform: z.string().min(1).optional(),
   name: z
     .string()
     .min(1)
@@ -22,8 +23,10 @@ export const manifestSchema = z.object({
     .string()
     .regex(/^\d+\.\d+\.\d+$/, "Must follow semver (e.g. 1.0.0)"),
   author: z.string().min(1),
-  channels: z.array(z.string()).optional().default([]),
-  skills: z.array(z.string()).optional().default([]),
+  skills: z
+    .array(z.object({ name: z.string(), description: z.string() }))
+    .optional()
+    .default([]),
   plugins: z.array(z.string()).optional().default([]),
   modelPreferences: z
     .object({

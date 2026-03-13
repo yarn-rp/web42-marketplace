@@ -12,9 +12,9 @@ import {
   MenuIcon,
   MonitorIcon,
   MoonIcon,
-  SettingsIcon,
   StoreIcon,
   SunIcon,
+  TerminalIcon,
   UserIcon,
 } from "lucide-react"
 
@@ -43,11 +43,12 @@ import {
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
+import { MarketplaceNavItem } from "@/components/marketplace-nav"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 const baseNavLinks = [
-  { href: "/explore", label: "Marketplace", icon: StoreIcon },
+  { href: "/cli", label: "CLI", icon: TerminalIcon },
   { href: "/docs", label: "Docs", icon: BookOpenIcon },
 ]
 
@@ -65,10 +66,10 @@ export function TopNav({ profile }: { profile: Profile | null }) {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-        {/* Left: Logo + Nav */}
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2">
+      <div className="relative mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
+        {/* Left: Logo */}
+        <div className="relative z-10 flex items-center">
+          <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-90">
             <Image
               src="/assets/logo/web42_logo_white.png"
               alt="web42"
@@ -86,11 +87,13 @@ export function TopNav({ profile }: { profile: Profile | null }) {
               priority
             />
           </Link>
+        </div>
 
-          <Separator orientation="vertical" className="hidden h-5 sm:block" />
-
-          <NavigationMenu className="hidden sm:flex">
+        {/* Center: Nav (absolutely positioned for true centering) */}
+        <div className="pointer-events-none absolute inset-0 hidden items-center justify-center sm:flex">
+          <NavigationMenu className="pointer-events-auto">
             <NavigationMenuList>
+              <MarketplaceNavItem profile={profile} pathname={pathname} />
               {baseNavLinks.map((link) => (
                 <NavigationMenuItem key={link.href}>
                   <Link href={link.href} legacyBehavior passHref>
@@ -109,34 +112,19 @@ export function TopNav({ profile }: { profile: Profile | null }) {
                   </Link>
                 </NavigationMenuItem>
               ))}
-              {profile?.username && (
-                <NavigationMenuItem>
-                  <Link
-                    href={`/${profile.username}`}
-                    legacyBehavior
-                    passHref
-                  >
-                    <NavigationMenuLink
-                      className={cn(
-                        navigationMenuTriggerStyle(),
-                        "text-sm",
-                        pathname === `/${profile.username}` ||
-                          pathname.startsWith(`/${profile.username}/`)
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      Profile
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-              )}
             </NavigationMenuList>
           </NavigationMenu>
         </div>
 
-        {/* Right: Profile */}
+        {/* Right: CTA + Profile */}
         <div className="flex items-center gap-2">
+          <Button size="sm" asChild className="hidden font-mono sm:inline-flex">
+            <Link href="/cli">
+              <TerminalIcon className="mr-2 size-3.5" />
+              Get the CLI
+            </Link>
+          </Button>
+
           {profile ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -171,9 +159,9 @@ export function TopNav({ profile }: { profile: Profile | null }) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/settings">
-                    <SettingsIcon className="mr-2 size-4" />
-                    Settings
+                  <Link href={`/${profile.username}?tab=marketplace`}>
+                    <StoreIcon className="mr-2 size-4" />
+                    Marketplace
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
@@ -225,6 +213,26 @@ export function TopNav({ profile }: { profile: Profile | null }) {
             </SheetTrigger>
             <SheetContent side="right" className="w-64 p-6">
               <nav className="mt-8 flex flex-col gap-2">
+                <Button size="sm" asChild className="mb-2 font-mono">
+                  <Link href="/cli" onClick={() => setSheetOpen(false)}>
+                    <TerminalIcon className="mr-2 size-3.5" />
+                    Get the CLI
+                  </Link>
+                </Button>
+
+                <Link
+                  href="/explore"
+                  onClick={() => setSheetOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                    pathname === "/explore" || pathname.startsWith("/explore/")
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <StoreIcon className="size-4" />
+                  Marketplace
+                </Link>
                 {baseNavLinks.map((link) => (
                   <Link
                     key={link.href}
@@ -241,22 +249,6 @@ export function TopNav({ profile }: { profile: Profile | null }) {
                     {link.label}
                   </Link>
                 ))}
-                {profile?.username && (
-                  <Link
-                    href={`/${profile.username}`}
-                    onClick={() => setSheetOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                      pathname === `/${profile.username}` ||
-                        pathname.startsWith(`/${profile.username}/`)
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <UserIcon className="size-4" />
-                    Profile
-                  </Link>
-                )}
                 {!profile && (
                   <Link
                     href="/login"

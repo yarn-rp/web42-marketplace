@@ -67,7 +67,8 @@ export const getAgents = cache(
     search?: string,
     category?: string,
     tag?: string,
-    sort: SortOption = "trending"
+    sort: SortOption = "trending",
+    platform?: string
   ) => {
     const db = await createClient()
     let query = db
@@ -75,10 +76,15 @@ export const getAgents = cache(
       .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), resources:agent_resources(id, url, type, sort_order)")
       .eq("visibility", "public")
 
+    if (platform) {
+      query = query.eq("manifest->>platform", platform)
+    }
+
     if (search) {
-      query = query.or(
-        `name.ilike.%${search}%,description.ilike.%${search}%,slug.ilike.%${search}%`
-      )
+      query = query.textSearch("search_vector", search, {
+        type: "websearch",
+        config: "english",
+      })
     }
 
     if (category) {
@@ -428,10 +434,14 @@ export async function acquireAgent(agentId: string) {
 
   if (!agent) return { error: "Agent not found" }
 
+  if ((agent.price_cents ?? 0) > 0) {
+    return { error: "This is a paid agent. Please purchase through checkout." }
+  }
+
   const { error } = await db.from("agent_access").insert({
     user_id: user.id,
     agent_id: agentId,
-    price_cents_at_acquisition: agent.price_cents ?? 0,
+    price_cents_at_acquisition: 0,
   })
 
   if (error) {
@@ -561,6 +571,25 @@ export async function updateAgentPrice(
   } = await db.auth.getUser()
 
   if (!user) return { error: "Not authenticated" }
+
+  if (priceCents !== 0 && priceCents < 500) {
+    return { error: "Minimum price is $5.00. Set to $0 for free." }
+  }
+
+  if (priceCents > 0) {
+    const { data: profile } = await db
+      .from("users")
+      .select("stripe_payouts_enabled")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.stripe_payouts_enabled) {
+      return {
+        error:
+          "Connect a Stripe account in Settings before setting a paid price.",
+      }
+    }
+  }
 
   const { error } = await db
     .from("agents")

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext } from "react"
+import { createContext, useContext, type ReactNode } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 
 const FadeInStaggerContext = createContext(false)
@@ -27,5 +27,29 @@ export function FadeIn(props: any) {
           })}
       {...props}
     />
+  )
+}
+
+export function FadeInStagger({
+  children,
+  faster = false,
+  className,
+}: {
+  children: ReactNode
+  faster?: boolean
+  className?: string
+}) {
+  return (
+    <FadeInStaggerContext.Provider value={true}>
+      <motion.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={viewport}
+        transition={{ staggerChildren: faster ? 0.06 : 0.1 }}
+        className={className}
+      >
+        {children}
+      </motion.div>
+    </FadeInStaggerContext.Provider>
   )
 }

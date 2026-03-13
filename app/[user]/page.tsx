@@ -1,12 +1,12 @@
+import { Suspense } from "react"
 import { notFound } from "next/navigation"
 
 import { FadeIn } from "@/components/cult/fade-in"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { ProfileAgentGrid } from "@/components/profile-agent-grid"
 import { ProfileHeader } from "@/components/profile-header"
-import { ProfileReadmeEditor } from "@/components/profile-readme-editor"
+import { ProfileTabs } from "@/components/profile-tabs"
 import { getAgentsByUser } from "@/app/actions/agent"
 import { getCurrentProfile, getProfile } from "@/app/actions/profile"
+import { getSellerOrders } from "@/app/actions/stripe"
 
 export default async function UserProfilePage({
   params,
@@ -26,44 +26,33 @@ export default async function UserProfilePage({
   ])
 
   const isOwner = !!currentProfile && currentProfile.id === profile.id
+
+  const sellerOrders =
+    isOwner && profile.stripe_payouts_enabled
+      ? await getSellerOrders()
+      : []
+
   const totalStars = agents.reduce((sum, a) => sum + a.stars_count, 0)
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <FadeIn>
         <ProfileHeader
           profile={profile}
           totalStars={totalStars}
           agentCount={agents.length}
+          isOwner={isOwner}
         />
 
-        {isOwner ? (
-          <section className="mb-8">
-            <ProfileReadmeEditor
-              initialContent={profile.profile_readme ?? ""}
-            />
-          </section>
-        ) : (
-          profile.profile_readme && (
-            <section className="mb-8">
-              <h2 className="mb-4 text-lg font-semibold">About</h2>
-              <div className="rounded-lg border bg-muted/30 p-6">
-                <MarkdownRenderer content={profile.profile_readme} />
-              </div>
-            </section>
-          )
-        )}
-
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">
-            {isOwner ? "Your Agents" : "Published Agents"}
-          </h2>
-          <ProfileAgentGrid
+        <Suspense>
+          <ProfileTabs
+            profile={profile}
             agents={agents}
+            sellerOrders={sellerOrders}
             isOwner={isOwner}
             profileUsername={profile.username ?? username}
           />
-        </section>
+        </Suspense>
       </FadeIn>
     </div>
   )

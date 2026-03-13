@@ -10,6 +10,10 @@ interface AgentResult {
   name: string
   description: string
   stars_count: number
+  price_cents: number
+  manifest?: {
+    platform?: string
+  }
   owner: {
     username: string
   }
@@ -59,15 +63,27 @@ export const searchCommand = new Command("search")
           const ref = `@${agent.owner.username}/${agent.slug}`
           const stars =
             agent.stars_count > 0 ? chalk.yellow(` \u2605 ${agent.stars_count}`) : ""
+          const price =
+            agent.price_cents > 0
+              ? chalk.green(` $${(agent.price_cents / 100).toFixed(2)}`)
+              : chalk.dim(" Free")
 
-          console.log(`  ${chalk.cyan.bold(agent.name)}${stars}`)
+          console.log(`  ${chalk.cyan.bold(agent.name)}${stars}${price}`)
           console.log(`  ${chalk.dim(ref)}`)
           if (agent.description) {
             console.log(`  ${truncate(agent.description, 80)}`)
           }
-          console.log(
-            chalk.dim(`  Install: web42 openclaw install ${ref}`)
-          )
+          const platform = agent.manifest?.platform ?? "openclaw"
+          if (agent.price_cents > 0) {
+            const siteUrl = process.env.WEB42_API_URL ?? "https://marketplace.web42.ai"
+            console.log(
+              chalk.dim(`  Purchase: ${siteUrl}/${agent.owner.username}/${agent.slug}`)
+            )
+          } else {
+            console.log(
+              chalk.dim(`  Install: web42 ${platform} install ${ref}`)
+            )
+          }
           console.log()
         }
 

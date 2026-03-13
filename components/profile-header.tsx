@@ -1,18 +1,23 @@
+"use client"
+
 import { ExternalLink, Github } from "lucide-react"
 
 import type { Profile } from "@/lib/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ProfileEditDialog } from "@/components/profile-edit-dialog"
 
 interface ProfileHeaderProps {
   profile: Profile
   totalStars: number
   agentCount: number
+  isOwner?: boolean
 }
 
 export function ProfileHeader({
   profile,
   totalStars,
   agentCount,
+  isOwner,
 }: ProfileHeaderProps) {
   return (
     <div className="flex items-start gap-6 mb-8">
@@ -23,9 +28,12 @@ export function ProfileHeader({
         </AvatarFallback>
       </Avatar>
       <div className="flex-1">
-        <h1 className="text-2xl font-bold">
-          {profile.full_name || profile.username}
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">
+            {profile.full_name || profile.username}
+          </h1>
+          {isOwner && <ProfileEditDialog profile={profile} />}
+        </div>
         <p className="text-muted-foreground">@{profile.username}</p>
         {profile.bio && <p className="mt-2 text-sm">{profile.bio}</p>}
         <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">

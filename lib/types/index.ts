@@ -10,6 +10,12 @@ export type {
   Tag,
   AgentManifest,
   ConfigVariable,
+  SkillEntry,
+  Order,
+  OrderStatus,
+  PaymentMethod,
+  Refund,
+  RefundStatus,
 } from "./agent"
 export type { Profile } from "./profile"
 export { manifestSchema } from "./manifest"

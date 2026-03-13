@@ -108,8 +108,7 @@ export interface AgentManifest {
   description: string
   version: string
   author: string
-  channels?: string[]
-  skills?: string[]
+  skills?: SkillEntry[]
   plugins?: string[]
   modelPreferences?: {
     primary?: string
@@ -121,10 +120,52 @@ export interface AgentManifest {
   configVariables?: ConfigVariable[]
 }
 
+export interface SkillEntry {
+  name: string
+  description: string
+}
+
 export interface ConfigVariable {
   key: string
   label: string
   description?: string
   required: boolean
   default?: string
+}
+
+export type OrderStatus = "pending" | "completed" | "refunded" | "failed"
+export type PaymentMethod = "stripe" | "wallet"
+export type RefundStatus = "pending" | "succeeded" | "failed"
+
+export interface Order {
+  id: string
+  buyer_id: string
+  agent_id: string
+  seller_id: string
+  stripe_checkout_session_id: string | null
+  stripe_payment_intent_id: string | null
+  amount_cents: number
+  platform_fee_cents: number
+  seller_amount_cents: number
+  currency: string
+  payment_method: PaymentMethod
+  status: OrderStatus
+  refund_eligible_until: string | null
+  created_at: string
+  updated_at: string
+  agent?: Agent
+  buyer?: import("./profile").Profile
+  seller?: import("./profile").Profile
+}
+
+export interface Refund {
+  id: string
+  order_id: string
+  stripe_refund_id: string | null
+  amount_cents: number
+  reason: string | null
+  refund_method: PaymentMethod
+  status: RefundStatus
+  created_at: string
+  order?: Order
 }
