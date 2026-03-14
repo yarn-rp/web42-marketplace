@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/db/supabase/server"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { getStripe } from "@/lib/stripe"
 import { getSiteUrl } from "@/lib/stripe-api"
 import { calculateFees, MIN_PRICE_CENTS, REFUND_WINDOW_DAYS } from "@/lib/stripe-utils"
@@ -143,7 +144,12 @@ export async function POST(request: NextRequest) {
     Date.now() + REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000
   ).toISOString()
 
-  await db.from("orders").insert({
+  const adminDb = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  await adminDb.from("orders").insert({
     buyer_id: user.id,
     agent_id: agent.id,
     seller_id: agent.owner_id,
