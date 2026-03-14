@@ -20,6 +20,7 @@ import { StripeConnectButton } from "@/components/stripe-connect-button"
 interface ProfileTabsProps {
   profile: Profile
   agents: Agent[]
+  purchasedAgents?: Agent[]
   sellerOrders: Order[]
   isOwner: boolean
   profileUsername: string
@@ -41,6 +42,7 @@ function AboutSection({ content }: { content: string | null }) {
 export function ProfileTabs({
   profile,
   agents,
+  purchasedAgents = [],
   sellerOrders,
   isOwner,
   profileUsername,
@@ -83,6 +85,17 @@ export function ProfileTabs({
             profileUsername={profileUsername}
           />
         </section>
+
+        {purchasedAgents.length > 0 && (
+          <section>
+            <h2 className="mb-4 text-lg font-semibold">Purchased</h2>
+            <ProfileAgentGrid
+              agents={purchasedAgents}
+              isOwner={false}
+              profileUsername={profileUsername}
+            />
+          </section>
+        )}
       </TabsContent>
 
       <TabsContent value="marketplace" className="mt-6">

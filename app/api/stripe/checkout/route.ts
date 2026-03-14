@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
         destination: owner.stripe_account_id,
       },
     },
-    success_url: `${agentUrl}?checkout=success`,
+    success_url: `${agentUrl}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${agentUrl}?checkout=cancel`,
     metadata: {
       buyer_id: user.id,

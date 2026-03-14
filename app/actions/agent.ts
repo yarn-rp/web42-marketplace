@@ -281,6 +281,38 @@ export const getMyAgents = cache(async () => {
   return data as Agent[]
 })
 
+export const getPurchasedAgents = cache(async () => {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return []
+
+  const { data: accessRows, error: accessError } = await db
+    .from("agent_access")
+    .select("agent_id")
+    .eq("user_id", user.id)
+
+  if (accessError || !accessRows?.length) return []
+
+  const agentIds = accessRows.map((r) => r.agent_id)
+
+  const { data, error } = await db
+    .from("agents")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
+    .in("id", agentIds)
+    .neq("owner_id", user.id)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error fetching purchased agents:", error)
+    return []
+  }
+
+  return data as Agent[]
+})
+
 export async function starAgent(agentId: string) {
   const db = await createClient()
   const {

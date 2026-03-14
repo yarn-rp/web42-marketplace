@@ -4,6 +4,7 @@ import "server-only"
 import { cache } from "react"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/db/supabase/server"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { getStripe } from "@/lib/stripe"
 import { isRefundEligible } from "@/lib/stripe-utils"
 
@@ -117,6 +118,71 @@ export async function getOrderForAgent(agentId: string) {
     .maybeSingle()
 
   return data as Order | null
+}
+
+export async function verifyAndFulfillCheckout(
+  sessionId: string
+): Promise<{ success: boolean }> {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { success: false }
+
+  let session
+  try {
+    session = await getStripe().checkout.sessions.retrieve(sessionId)
+  } catch {
+    return { success: false }
+  }
+
+  if (session.payment_status !== "paid") return { success: false }
+
+  const buyerId = session.metadata?.buyer_id
+  if (buyerId !== user.id) return { success: false }
+
+  const adminDb = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: order } = await adminDb
+    .from("orders")
+    .select("id, status, buyer_id, agent_id")
+    .eq("stripe_checkout_session_id", sessionId)
+    .single()
+
+  if (!order) return { success: false }
+
+  if (order.status === "completed") return { success: true }
+
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id
+
+  await adminDb
+    .from("orders")
+    .update({
+      status: "completed",
+      stripe_payment_intent_id: paymentIntentId,
+    })
+    .eq("id", order.id)
+
+  const amountCents =
+    Number(session.metadata?.amount_cents) || session.amount_total || 0
+
+  await adminDb.from("agent_access").upsert(
+    {
+      user_id: order.buyer_id,
+      agent_id: order.agent_id,
+      price_cents_at_acquisition: amountCents,
+    },
+    { onConflict: "user_id,agent_id" }
+  )
+
+  return { success: true }
 }
 
 export async function requestRefund(orderId: string, reason?: string) {

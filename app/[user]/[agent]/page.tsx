@@ -8,16 +8,25 @@ import {
   getAgentResources,
   getPublishValidation,
 } from "@/app/actions/agent"
-import { getOrderForAgent } from "@/app/actions/stripe"
+import { getOrderForAgent, verifyAndFulfillCheckout } from "@/app/actions/stripe"
 import { getCachedTags } from "@/app/actions/filters"
 import { getCurrentProfile } from "@/app/actions/profile"
 
 export default async function AgentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ user: string; agent: string }>
+  searchParams: Promise<{ checkout?: string; session_id?: string }>
 }) {
   const { user: username, agent: agentSlug } = await params
+  const { checkout, session_id } = await searchParams
+
+  const checkoutSuccess = checkout === "success"
+
+  if (checkoutSuccess && session_id) {
+    await verifyAndFulfillCheckout(session_id)
+  }
 
   const agent = await getAgentBySlug(username, agentSlug)
   if (!agent) {
@@ -56,6 +65,8 @@ export default async function AgentPage({
             selectedTagIds={selectedTagIds}
             profileUsername={profileUsername}
             order={order}
+            checkoutSuccess={checkoutSuccess && hasAccess}
+            currentUsername={currentProfile?.username ?? undefined}
           />
         </FadeIn>
       </div>

@@ -25,6 +25,7 @@ import { Separator } from "@/components/ui/separator"
 
 import { AgentDetailTabs } from "./agent-detail-tabs"
 import { AgentPriceBadge } from "./agent-price-badge"
+import { CheckoutSuccess } from "./checkout-success"
 import { GetAgentButton } from "./get-agent-button"
 import { InstallButton } from "./install-button"
 import { RefundButton } from "./refund-button"
@@ -45,6 +46,8 @@ interface AgentShowcaseProps {
   selectedTagIds?: string[]
   profileUsername?: string
   order?: Order | null
+  checkoutSuccess?: boolean
+  currentUsername?: string
 }
 
 export function AgentShowcase({
@@ -59,6 +62,8 @@ export function AgentShowcase({
   selectedTagIds = [],
   profileUsername = "",
   order = null,
+  checkoutSuccess = false,
+  currentUsername,
 }: AgentShowcaseProps) {
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
@@ -74,6 +79,16 @@ export function AgentShowcase({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
+      {checkoutSuccess && (
+        <CheckoutSuccess
+          agentName={agent.name}
+          agentSlug={agent.slug}
+          username={username}
+          platform={agent.manifest?.platform}
+          currentUsername={currentUsername}
+        />
+      )}
+
       {/* Name and description at top */}
       <div className="mb-6">
         <div className="mb-2 flex flex-wrap items-center gap-3">

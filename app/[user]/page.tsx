@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { FadeIn } from "@/components/cult/fade-in"
 import { ProfileHeader } from "@/components/profile-header"
 import { ProfileTabs } from "@/components/profile-tabs"
-import { getAgentsByUser } from "@/app/actions/agent"
+import { getAgentsByUser, getPurchasedAgents } from "@/app/actions/agent"
 import { getCurrentProfile, getProfile } from "@/app/actions/profile"
 import { getSellerOrders } from "@/app/actions/stripe"
 
@@ -27,10 +27,10 @@ export default async function UserProfilePage({
 
   const isOwner = !!currentProfile && currentProfile.id === profile.id
 
-  const sellerOrders =
-    isOwner && profile.stripe_payouts_enabled
-      ? await getSellerOrders()
-      : []
+  const [sellerOrders, purchasedAgents] = await Promise.all([
+    isOwner && profile.stripe_payouts_enabled ? getSellerOrders() : [],
+    isOwner ? getPurchasedAgents() : [],
+  ])
 
   const totalStars = agents.reduce((sum, a) => sum + a.stars_count, 0)
 
@@ -48,6 +48,7 @@ export default async function UserProfilePage({
           <ProfileTabs
             profile={profile}
             agents={agents}
+            purchasedAgents={purchasedAgents}
             sellerOrders={sellerOrders}
             isOwner={isOwner}
             profileUsername={profile.username ?? username}
