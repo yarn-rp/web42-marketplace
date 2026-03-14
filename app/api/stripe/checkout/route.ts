@@ -4,6 +4,46 @@ import { getStripe } from "@/lib/stripe"
 import { getSiteUrl } from "@/lib/stripe-api"
 import { calculateFees, MIN_PRICE_CENTS, REFUND_WINDOW_DAYS } from "@/lib/stripe-utils"
 
+const MAX_DESCRIPTION_LENGTH = 500
+
+function buildProductDescription(agent: {
+  description?: string | null
+  readme?: string | null
+  manifest?: { skills?: { name: string }[] } | null
+}): string {
+  const parts: string[] = []
+
+  if (agent.description?.trim()) {
+    parts.push(agent.description.trim())
+  }
+
+  const skills = agent.manifest?.skills
+  if (skills?.length) {
+    const skillNames = skills.map((s) => s.name).filter(Boolean).join(", ")
+    if (skillNames) {
+      parts.push(`Skills: ${skillNames}`)
+    }
+  }
+
+  if (agent.readme?.trim()) {
+    const stripped = agent.readme
+      .replace(/^#+\s*/gm, "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\n+/g, " ")
+      .trim()
+    const excerpt = stripped.slice(0, 300)
+    if (excerpt) {
+      parts.push(excerpt + (stripped.length > 300 ? "..." : ""))
+    }
+  }
+
+  const combined = parts.join("\n\n")
+  if (combined.length <= MAX_DESCRIPTION_LENGTH) return combined
+  return combined.slice(0, MAX_DESCRIPTION_LENGTH - 3) + "..."
+}
+
 export async function POST(request: NextRequest) {
   const db = await createClient()
   const {
@@ -22,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   const { data: agent } = await db
     .from("agents")
-    .select("id, slug, name, price_cents, currency, owner_id, profile_image_url, owner:users!owner_id(username, stripe_account_id, stripe_payouts_enabled)")
+    .select("id, slug, name, description, readme, manifest, price_cents, currency, owner_id, profile_image_url, owner:users!owner_id(username, stripe_account_id, stripe_payouts_enabled)")
     .eq("id", agentId)
     .single()
 
@@ -70,6 +110,7 @@ export async function POST(request: NextRequest) {
           currency: agent.currency || "usd",
           product_data: {
             name: agent.name,
+            description: buildProductDescription(agent),
             ...(agent.profile_image_url
               ? { images: [agent.profile_image_url] }
               : {}),
