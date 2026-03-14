@@ -52,7 +52,7 @@ export function CliHero() {
         initial={{ opacity: reducedMotion ? 1 : 0, y: reducedMotion ? 0 : 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: reducedMotion ? 0 : 2.3, duration: 0.5 }}
-        className="w-full max-w-md"
+        className="w-full max-w-2xl"
       >
         <CliInstallBlock />
       </motion.div>

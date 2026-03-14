@@ -35,7 +35,7 @@ export function CreatorCTA() {
             The CLI is required to use Web42. Without it, you can&apos;t install
             or publish agents. One command and you&apos;re in.
           </p>
-          <CliInstallBlock className="w-full max-w-md" />
+          <CliInstallBlock className="w-full max-w-2xl" />
         </div>
       </FadeIn>
 
@@ -92,10 +92,10 @@ export function CreatorCTA() {
                   transition={{ duration: reducedMotion ? 0 : 0.4 }}
                   className="flex gap-2"
                 >
-                  <span className="select-none text-muted-foreground">
+                  <span className="select-none text-zinc-500">
                     {line.prefix}
                   </span>
-                  <span className={line.prefix === "#" ? "text-muted-foreground" : ""}>
+                  <span className={line.prefix === "#" ? "text-zinc-600" : "text-zinc-300"}>
                     {line.text}
                   </span>
                 </motion.div>

@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion"
 
+import { cn } from "@/lib/utils"
 import { PixelRobot, PixelTerminal } from "@/components/pixel-art"
 import { TerminalWindow } from "@/components/terminal-window"
 import { TypingAnimation } from "@/components/typing-animation"
@@ -86,12 +87,15 @@ export function LoginHero() {
                 transition={{ duration: reducedMotion ? 0 : 0.4 }}
                 className="flex gap-2"
               >
-                <span className="select-none text-muted-foreground">
+                <span className={cn(
+                  "select-none",
+                  line.prefix === ">" ? "text-green-400" : "text-zinc-500"
+                )}>
                   {line.prefix}
                 </span>
                 <span
                   className={
-                    line.prefix === ">" ? "text-muted-foreground" : ""
+                    line.prefix === ">" ? "text-zinc-400" : "text-zinc-300"
                   }
                 >
                   {line.text}
