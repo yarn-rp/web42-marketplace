@@ -64,17 +64,16 @@ export default function DocsFaqPage() {
             <AccordionTrigger>How do I install the CLI?</AccordionTrigger>
             <AccordionContent>
               <p className="text-muted-foreground">
-                Run <code className={code}>npm install -g web42</code>. Requires
-                Node.js 18 or later. The CLI is required for all marketplace
-                operations — installing agents, publishing, searching, and more.
-                See the{" "}
+                Run a single command to install &mdash; options include a shell
+                script, Homebrew, npm, and Scoop. No runtime dependencies
+                required. See the{" "}
                 <Link
                   href="/docs/cli"
                   className="underline underline-offset-4 hover:text-foreground"
                 >
                   CLI docs
                 </Link>{" "}
-                for full usage.
+                for all install methods and full usage.
               </p>
             </AccordionContent>
           </AccordionItem>

@@ -12,6 +12,7 @@ import { remixCommand } from "./commands/remix.js"
 import { searchCommand } from "./commands/search.js"
 import { getAllPlatformCommands } from "./platforms/registry.js"
 import { setApiUrl } from "./utils/config.js"
+import { CLI_VERSION } from "./version.js"
 
 const program = new Command()
 
@@ -20,7 +21,7 @@ program
   .description(
     "Web42 Agent Marketplace CLI — manage, install, and publish agent packages"
   )
-  .version("0.1.0")
+  .version(CLI_VERSION)
   .option("--api-url <url>", "Override the API URL for this invocation")
   .hook("preAction", (thisCommand) => {
     const opts = thisCommand.opts()

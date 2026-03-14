@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:binary": "bash scripts/sync-version.sh && bash scripts/build-binaries.sh",
     "dev": "tsc --watch",
     "start": "node dist/index.js"
   },

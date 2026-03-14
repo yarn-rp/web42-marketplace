@@ -1,5 +1,7 @@
 import Link from "next/link"
 
+import { CliInstallBlock } from "@/components/landing/cli-install-block"
+
 export default function DocsCliPage() {
   return (
     <div className="space-y-8">
@@ -13,12 +15,10 @@ export default function DocsCliPage() {
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">Installation</h2>
         <p className="text-muted-foreground">
-          Install the Web42 CLI globally with npm. Requires Node.js 18 or
-          later.
+          Install the Web42 CLI using any of the methods below. No runtime
+          dependencies required.
         </p>
-        <div className="rounded-lg border bg-muted/50 p-4 font-mono text-sm">
-          npm install -g web42
-        </div>
+        <CliInstallBlock />
         <p className="text-muted-foreground">
           Verify the installation by checking the version:
         </p>

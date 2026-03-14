@@ -1,5 +1,7 @@
 import Link from "next/link"
 
+import { CliInstallBlock } from "@/components/landing/cli-install-block"
+
 export default function DocsQuickstartPage() {
   return (
     <div className="space-y-8">
@@ -13,8 +15,6 @@ export default function DocsQuickstartPage() {
       <section>
         <h2 className="mb-4 text-xl font-semibold">Prerequisites</h2>
         <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
-          <li>Node.js &gt;= 18</li>
-          <li>npm</li>
           <li>A GitHub account (used for authentication)</li>
         </ul>
       </section>
@@ -25,9 +25,7 @@ export default function DocsQuickstartPage() {
           The Web42 CLI is required for all marketplace operations — searching,
           installing, and publishing agents.
         </p>
-        <div className="rounded-lg border bg-muted/50 p-4 font-mono text-sm">
-          <code>npm install -g web42</code>
-        </div>
+        <CliInstallBlock />
       </section>
 
       <section>
