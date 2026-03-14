@@ -2,9 +2,9 @@
 
 import { motion, useReducedMotion } from "framer-motion"
 
-import { cn } from "@/lib/utils"
 import { PixelRobot, PixelTerminal } from "@/components/pixel-art"
 import { TerminalWindow } from "@/components/terminal-window"
+import { TerminalLine } from "@/components/terminal-line"
 import { TypingAnimation } from "@/components/typing-animation"
 
 const terminalLines = [
@@ -85,21 +85,8 @@ export function LoginHero() {
                 key={i}
                 variants={lineVariants}
                 transition={{ duration: reducedMotion ? 0 : 0.4 }}
-                className="flex gap-2"
               >
-                <span className={cn(
-                  "select-none",
-                  line.prefix === ">" ? "text-green-400" : "text-zinc-500"
-                )}>
-                  {line.prefix}
-                </span>
-                <span
-                  className={
-                    line.prefix === ">" ? "text-zinc-400" : "text-zinc-300"
-                  }
-                >
-                  {line.text}
-                </span>
+                <TerminalLine prefix={line.prefix}>{line.text}</TerminalLine>
               </motion.div>
             ))}
           </motion.div>

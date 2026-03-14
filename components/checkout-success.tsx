@@ -116,10 +116,10 @@ export function CheckoutSuccess({
                   key={i}
                   className={cn(
                     "font-mono",
-                    i === 0 && "text-zinc-500",
-                    line.startsWith(">") && "text-emerald-400",
-                    line.startsWith("✓") && "font-semibold text-emerald-400",
-                    !line.startsWith(">") && !line.startsWith("✓") && i !== 0 && "text-zinc-300"
+                    i === 0 && "text-zinc-400 dark:text-zinc-500",
+                    line.startsWith(">") && "text-emerald-600 dark:text-emerald-400",
+                    line.startsWith("✓") && "font-semibold text-emerald-600 dark:text-emerald-400",
+                    !line.startsWith(">") && !line.startsWith("✓") && i !== 0 && "text-zinc-700 dark:text-zinc-300"
                   )}
                 >
                   {line || "\u00A0"}

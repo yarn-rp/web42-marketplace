@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { FadeIn } from "@/components/cult/fade-in"
 import { TerminalWindow } from "@/components/terminal-window"
+import { TerminalLine } from "@/components/terminal-line"
 import { CliInstallBlock } from "@/components/landing/cli-install-block"
 import { PixelTerminal } from "@/components/pixel-art"
 
@@ -90,14 +91,8 @@ export function CreatorCTA() {
                   key={i}
                   variants={lineVariants}
                   transition={{ duration: reducedMotion ? 0 : 0.4 }}
-                  className="flex gap-2"
                 >
-                  <span className="select-none text-zinc-500">
-                    {line.prefix}
-                  </span>
-                  <span className={line.prefix === "#" ? "text-zinc-600" : "text-zinc-300"}>
-                    {line.text}
-                  </span>
+                  <TerminalLine prefix={line.prefix}>{line.text}</TerminalLine>
                 </motion.div>
               ))}
             </motion.div>
