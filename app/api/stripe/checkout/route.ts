@@ -37,8 +37,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const ownerArr = agent.owner as unknown as Array<{ username: string; stripe_account_id: string | null; stripe_payouts_enabled: boolean }> | null
-  const owner = ownerArr?.[0] ?? null
+  const owner = agent.owner as unknown as { username: string; stripe_account_id: string | null; stripe_payouts_enabled: boolean } | null
   if (!owner?.stripe_account_id || !owner.stripe_payouts_enabled) {
     return NextResponse.json(
       { error: "This seller is not set up to receive payments" },
