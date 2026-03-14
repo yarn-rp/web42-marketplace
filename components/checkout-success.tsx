@@ -188,6 +188,11 @@ export function CheckoutSuccess({
                   </div>
                 </div>
 
+                {/* Creator note */}
+                <div className="text-xs italic text-zinc-400 dark:text-zinc-500">
+                  Thanks for supporting @{username} ♥
+                </div>
+
                 <div className="h-px bg-zinc-200 dark:bg-[#2a2b3d]" />
 
                 {/* Actions as terminal links */}
