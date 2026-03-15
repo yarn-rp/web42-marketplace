@@ -114,7 +114,7 @@ async function handleCheckoutCompleted(
   )
 
   sendPurchaseEmails(db, session, order).catch((err) =>
-    console.error("Failed to send purchase emails:", err)
+    console.error("[EMAIL] Failed to send purchase emails:", err)
   )
 }
 
@@ -123,10 +123,16 @@ async function sendPurchaseEmails(
   session: Stripe.Checkout.Session,
   order: { buyer_id: string; agent_id: string }
 ) {
-  if (!process.env.RESEND_API_KEY) return
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("[EMAIL] RESEND_API_KEY not set, skipping emails")
+    return
+  }
 
   const sellerId = session.metadata?.seller_id
-  if (!sellerId) return
+  if (!sellerId) {
+    console.warn("[EMAIL] No seller_id in session metadata, skipping emails")
+    return
+  }
 
   const amountCents = Number(session.metadata?.amount_cents) || 0
   const sellerAmountCents = Number(session.metadata?.seller_amount_cents) || 0
@@ -147,7 +153,10 @@ async function sendPurchaseEmails(
 
   const buyerEmail = buyerAuth.data?.user?.email
   const sellerEmail = sellerAuth.data?.user?.email
-  if (!buyerEmail || !sellerEmail) return
+  if (!buyerEmail || !sellerEmail) {
+    console.warn("[EMAIL] Missing email addresses — buyer:", !!buyerEmail, "seller:", !!sellerEmail)
+    return
+  }
 
   const buyerProfile = profiles.data?.find(
     (p: { id: string }) => p.id === order.buyer_id
@@ -163,9 +172,11 @@ async function sendPurchaseEmails(
   const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://web42.ai"
   const agentUrl = `${siteUrl}/${sellerUsername}/${agentSlug}`
 
+  console.log("[EMAIL] Sending purchase emails — seller:", sellerEmail, "buyer:", buyerEmail, "agent:", agentName)
+
   const emailClient = getResend()
 
-  await Promise.allSettled([
+  const results = await Promise.allSettled([
     emailClient.emails.send({
       from: EMAIL_FROM,
       to: sellerEmail,
@@ -191,6 +202,15 @@ async function sendPurchaseEmails(
       }),
     }),
   ])
+
+  results.forEach((result, i) => {
+    const label = i === 0 ? "seller" : "buyer"
+    if (result.status === "fulfilled") {
+      console.log(`[EMAIL] ${label} email sent:`, JSON.stringify(result.value))
+    } else {
+      console.error(`[EMAIL] ${label} email failed:`, result.reason)
+    }
+  })
 }
 
 async function handleCheckoutExpired(
