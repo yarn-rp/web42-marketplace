@@ -88,9 +88,11 @@ export const getSellerOrders = cache(async () => {
 
   const { data, error } = await db
     .from("orders")
-    .select("*, agent:agents(id, slug, name, profile_image_url)")
+    .select(
+      "*, agent:agents(id, slug, name, profile_image_url), buyer:users!buyer_id(username, full_name, avatar_url)"
+    )
     .eq("seller_id", user.id)
-    .eq("status", "completed")
+    .in("status", ["completed", "refunded"])
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -185,6 +187,77 @@ export async function verifyAndFulfillCheckout(
   return { success: true }
 }
 
+export async function issueSellerRefund(orderId: string, reason?: string) {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { data: order } = await db
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .eq("seller_id", user.id)
+    .eq("status", "completed")
+    .single()
+
+  if (!order) return { error: "Order not found" }
+
+  const { data: existingRefund } = await db
+    .from("refunds")
+    .select("id")
+    .eq("order_id", orderId)
+    .in("status", ["pending", "succeeded"])
+    .maybeSingle()
+
+  if (existingRefund) {
+    return { error: "A refund has already been processed for this order" }
+  }
+
+  if (!order.stripe_payment_intent_id) {
+    return { error: "No payment intent found for this order" }
+  }
+
+  const refund = await getStripe().refunds.create({
+    payment_intent: order.stripe_payment_intent_id,
+    reason: "requested_by_customer",
+    reverse_transfer: true,
+    refund_application_fee: true,
+  })
+
+  const { error: insertError } = await db.from("refunds").insert({
+    order_id: orderId,
+    stripe_refund_id: refund.id,
+    amount_cents: order.amount_cents,
+    reason: reason || "Seller-initiated refund",
+    refund_method: "stripe",
+    status: refund.status === "succeeded" ? "succeeded" : "pending",
+  })
+
+  if (insertError) {
+    console.error("Error inserting refund:", insertError)
+    return { error: "Failed to record refund" }
+  }
+
+  if (refund.status === "succeeded") {
+    await db
+      .from("orders")
+      .update({ status: "refunded" })
+      .eq("id", orderId)
+
+    await db
+      .from("agent_access")
+      .delete()
+      .eq("user_id", order.buyer_id)
+      .eq("agent_id", order.agent_id)
+  }
+
+  revalidatePath("/")
+  return { success: true }
+}
+
 export async function requestRefund(orderId: string, reason?: string) {
   const db = await createClient()
   const {
@@ -204,7 +277,7 @@ export async function requestRefund(orderId: string, reason?: string) {
   if (!order) return { error: "Order not found" }
 
   if (!isRefundEligible(order.created_at)) {
-    return { error: "Refund window has expired (7 days)" }
+    return { error: "Refund window has expired (72 hours)" }
   }
 
   const { data: existingRefund } = await db

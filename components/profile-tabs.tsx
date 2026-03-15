@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { ProfileAgentGrid } from "@/components/profile-agent-grid"
@@ -98,7 +97,7 @@ export function ProfileTabs({
         )}
       </TabsContent>
 
-      <TabsContent value="marketplace" className="mt-6">
+      <TabsContent value="marketplace" className="mt-6 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Payouts</CardTitle>
@@ -106,20 +105,28 @@ export function ProfileTabs({
               Connect Stripe to sell agents and receive payouts
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent>
             <StripeConnectButton
               stripeAccountId={profile.stripe_account_id}
               onboardingComplete={profile.stripe_onboarding_complete}
               payoutsEnabled={profile.stripe_payouts_enabled}
             />
-            {profile.stripe_payouts_enabled && (
-              <>
-                <Separator />
-                <SellerDashboard orders={sellerOrders} />
-              </>
-            )}
           </CardContent>
         </Card>
+
+        {profile.stripe_payouts_enabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Sales &amp; Revenue</CardTitle>
+              <CardDescription>
+                Track your sales, manage refunds, and view revenue
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SellerDashboard orders={sellerOrders} />
+            </CardContent>
+          </Card>
+        )}
       </TabsContent>
     </Tabs>
   )

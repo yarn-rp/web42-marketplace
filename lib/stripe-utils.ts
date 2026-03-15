@@ -1,6 +1,6 @@
 export const PLATFORM_FEE_PERCENT = 10
 export const MIN_PRICE_CENTS = 500
-export const REFUND_WINDOW_DAYS = 7
+export const REFUND_WINDOW_DAYS = 3
 
 export function calculateFees(amountCents: number) {
   const platformFeeCents = Math.floor(amountCents * (PLATFORM_FEE_PERCENT / 100))

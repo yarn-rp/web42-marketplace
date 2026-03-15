@@ -53,9 +53,13 @@ export function RefundButton({
     })
   }
 
-  const daysLeft = Math.ceil(
-    (deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  const hoursLeft = Math.ceil(
+    (deadline.getTime() - Date.now()) / (1000 * 60 * 60)
   )
+  const timeLeft =
+    hoursLeft >= 24
+      ? `${Math.ceil(hoursLeft / 24)} day${Math.ceil(hoursLeft / 24) !== 1 ? "s" : ""}`
+      : `${hoursLeft} hour${hoursLeft !== 1 ? "s" : ""}`
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -70,8 +74,8 @@ export function RefundButton({
           <AlertDialogTitle>Request a refund?</AlertDialogTitle>
           <AlertDialogDescription>
             You will receive a full refund of ${(amountCents / 100).toFixed(2)}{" "}
-            and lose access to this agent. You have {daysLeft} day
-            {daysLeft !== 1 ? "s" : ""} remaining in the refund window.
+            and lose access to this agent. You have {timeLeft} remaining
+            in the refund window.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
