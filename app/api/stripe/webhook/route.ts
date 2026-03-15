@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
 import { getStripe } from "@/lib/stripe"
+import { getResend, EMAIL_FROM } from "@/lib/email"
+import {
+  saleNotificationHtml,
+  saleNotificationSubject,
+} from "@/lib/emails/sale-notification"
+import {
+  purchaseConfirmationHtml,
+  purchaseConfirmationSubject,
+} from "@/lib/emails/purchase-confirmation"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminDb = ReturnType<typeof createSupabaseClient<any>>
@@ -103,6 +112,85 @@ async function handleCheckoutCompleted(
     },
     { onConflict: "user_id,agent_id" }
   )
+
+  sendPurchaseEmails(db, session, order).catch((err) =>
+    console.error("Failed to send purchase emails:", err)
+  )
+}
+
+async function sendPurchaseEmails(
+  db: AdminDb,
+  session: Stripe.Checkout.Session,
+  order: { buyer_id: string; agent_id: string }
+) {
+  if (!process.env.RESEND_API_KEY) return
+
+  const sellerId = session.metadata?.seller_id
+  if (!sellerId) return
+
+  const amountCents = Number(session.metadata?.amount_cents) || 0
+  const sellerAmountCents = Number(session.metadata?.seller_amount_cents) || 0
+
+  const [buyerAuth, sellerAuth, profiles, agentResult] = await Promise.all([
+    db.auth.admin.getUserById(order.buyer_id),
+    db.auth.admin.getUserById(sellerId),
+    db
+      .from("users")
+      .select("id, username")
+      .in("id", [order.buyer_id, sellerId]),
+    db
+      .from("agents")
+      .select("name, slug")
+      .eq("id", order.agent_id)
+      .single(),
+  ])
+
+  const buyerEmail = buyerAuth.data?.user?.email
+  const sellerEmail = sellerAuth.data?.user?.email
+  if (!buyerEmail || !sellerEmail) return
+
+  const buyerProfile = profiles.data?.find(
+    (p: { id: string }) => p.id === order.buyer_id
+  )
+  const sellerProfile = profiles.data?.find(
+    (p: { id: string }) => p.id === sellerId
+  )
+  const agentName = agentResult.data?.name ?? "Agent"
+  const agentSlug = agentResult.data?.slug ?? ""
+  const buyerUsername = buyerProfile?.username ?? "user"
+  const sellerUsername = sellerProfile?.username ?? "creator"
+
+  const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://web42.ai"
+  const agentUrl = `${siteUrl}/${sellerUsername}/${agentSlug}`
+
+  const emailClient = getResend()
+
+  await Promise.allSettled([
+    emailClient.emails.send({
+      from: EMAIL_FROM,
+      to: sellerEmail,
+      subject: saleNotificationSubject(agentName),
+      html: saleNotificationHtml({
+        buyerUsername,
+        buyerEmail,
+        agentName,
+        amountCents,
+        sellerAmountCents,
+      }),
+    }),
+    emailClient.emails.send({
+      from: EMAIL_FROM,
+      to: buyerEmail,
+      subject: purchaseConfirmationSubject(agentName),
+      html: purchaseConfirmationHtml({
+        sellerUsername,
+        sellerEmail,
+        agentName,
+        agentUrl,
+        amountCents,
+      }),
+    }),
+  ])
 }
 
 async function handleCheckoutExpired(
