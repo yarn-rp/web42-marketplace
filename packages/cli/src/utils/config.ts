@@ -13,7 +13,7 @@ interface Web42Config {
 const config = new Conf<Web42Config>({
   projectName: "web42",
   defaults: {
-    apiUrl: "https://agents.web42.ai",
+    apiUrl: "https://web42.ai",
     authenticated: false,
   },
 })

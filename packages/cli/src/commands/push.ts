@@ -162,7 +162,7 @@ export const pushCommand = new Command("push")
 
       console.log(
         chalk.dim(
-          `  View at: ${config.apiUrl ? config.apiUrl.replace("https://", "") : "agents.web42.ai"}/${config.username}/${manifest.name}`
+          `  View at: ${config.apiUrl ? config.apiUrl.replace("https://", "") : "web42.ai"}/${config.username}/${manifest.name}`
         )
       )
     } catch (error: any) {

@@ -115,7 +115,7 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
             agent.price_cents > 0
           ) {
             const siteUrl =
-              process.env.WEB42_API_URL ?? "https://marketplace.web42.ai"
+              process.env.WEB42_API_URL ?? "https://web42.ai"
             spinner.fail(
               `This is a paid agent ($${(agent.price_cents / 100).toFixed(2)}). Purchase it on the web first:`
             )

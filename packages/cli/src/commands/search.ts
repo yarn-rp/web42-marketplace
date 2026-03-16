@@ -75,7 +75,7 @@ export const searchCommand = new Command("search")
           }
           const platform = agent.manifest?.platform ?? "openclaw"
           if (agent.price_cents > 0) {
-            const siteUrl = process.env.WEB42_API_URL ?? "https://marketplace.web42.ai"
+            const siteUrl = process.env.WEB42_API_URL ?? "https://web42.ai"
             console.log(
               chalk.dim(`  Purchase: ${siteUrl}/${agent.owner.username}/${agent.slug}`)
             )
