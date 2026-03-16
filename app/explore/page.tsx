@@ -22,14 +22,42 @@ export default async function ExplorePage({
     tag?: string
     sort?: SortOption
     platform?: string
+    price?: string
+    minStars?: string
+    publishedFrom?: string
+    creator?: string
+    page?: string
   }
 }): Promise<ReactElement> {
-  const { search, category, tag, sort, platform } = searchParams
+  const {
+    search,
+    category,
+    tag,
+    sort,
+    platform,
+    price,
+    minStars,
+    publishedFrom,
+    creator,
+    page,
+  } = searchParams
   const categories = await getCachedCategories()
 
-  const hasFilter = search || category || tag || platform
+  const hasFilter =
+    search || category || tag || platform || price || minStars || publishedFrom || creator
 
-  const suspenseKey = JSON.stringify({ search, category, tag, sort, platform })
+  const suspenseKey = JSON.stringify({
+    search,
+    category,
+    tag,
+    sort,
+    platform,
+    price,
+    minStars,
+    publishedFrom,
+    creator,
+    page,
+  })
 
   return (
     <div className="w-full">
@@ -74,6 +102,11 @@ export default async function ExplorePage({
               tag={tag}
               sort={sort}
               platform={platform}
+              price={price}
+              minStars={minStars}
+              publishedFrom={publishedFrom}
+              creator={creator}
+              page={page}
             />
           </Suspense>
         </div>

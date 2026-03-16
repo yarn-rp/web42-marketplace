@@ -62,18 +62,35 @@ function getSortColumn(sort: SortOption) {
   }
 }
 
+export interface GetAgentsResult {
+  agents: Agent[]
+  totalCount: number
+}
+
+const DEFAULT_PAGE_SIZE = 24
+
 export const getAgents = cache(
   async (
     search?: string,
     category?: string,
     tag?: string,
     sort: SortOption = "trending",
-    platform?: string
-  ) => {
+    platform?: string,
+    price?: string,
+    minStars?: string,
+    publishedFrom?: string,
+    creator?: string,
+    page = 1,
+    limit = DEFAULT_PAGE_SIZE
+  ): Promise<GetAgentsResult> => {
     const db = await createClient()
+    const selectOpts = { count: "exact" as const }
     let query = db
       .from("agents")
-      .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), resources:agent_resources(id, url, type, sort_order)")
+      .select(
+        "*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), resources:agent_resources(id, url, type, sort_order)",
+        selectOpts
+      )
       .eq("visibility", "public")
 
     if (platform) {
@@ -106,10 +123,10 @@ export const getAgents = cache(
             agentIds.map((row) => row.agent_id)
           )
         } else {
-          return []
+          return { agents: [], totalCount: 0 }
         }
       } else {
-        return []
+        return { agents: [], totalCount: 0 }
       }
     }
 
@@ -132,24 +149,63 @@ export const getAgents = cache(
             agentIds.map((row) => row.agent_id)
           )
         } else {
-          return []
+          return { agents: [], totalCount: 0 }
         }
       } else {
-        return []
+        return { agents: [], totalCount: 0 }
+      }
+    }
+
+    if (price === "free") {
+      query = query.eq("price_cents", 0)
+    } else if (price === "paid") {
+      query = query.gt("price_cents", 0)
+    }
+
+    if (minStars) {
+      const min = parseInt(minStars, 10)
+      if (!isNaN(min)) query = query.gte("stars_count", min)
+    }
+
+    if (publishedFrom) {
+      const days = parseInt(publishedFrom, 10)
+      if (!isNaN(days)) {
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - days)
+        query = query
+          .not("published_at", "is", null)
+          .gte("published_at", cutoff.toISOString())
+      }
+    }
+
+    if (creator) {
+      const { data: owner } = await db
+        .from("users")
+        .select("id")
+        .eq("username", creator)
+        .maybeSingle()
+
+      if (owner) {
+        query = query.eq("owner_id", owner.id)
+      } else {
+        return { agents: [], totalCount: 0 }
       }
     }
 
     const { column, ascending } = getSortColumn(sort)
     query = query.order(column, { ascending })
 
-    const { data, error } = await query
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    const { data, error, count } = await query.range(from, to)
 
     if (error) {
       console.error("Error fetching agents:", error)
-      return []
+      return { agents: [], totalCount: 0 }
     }
 
-    return (data ?? []).map(flattenAgentRelations) as Agent[]
+    const agents = (data ?? []).map(flattenAgentRelations) as Agent[]
+    return { agents, totalCount: count ?? 0 }
   }
 )
 

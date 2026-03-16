@@ -7,11 +7,23 @@ import { Badge } from "@/components/ui/badge"
 interface CategoryPillProps {
   category: Category
   active?: boolean
+  preserveParams?: URLSearchParams
 }
 
-export function CategoryPill({ category, active }: CategoryPillProps) {
-  const href =
-    category.name === "All"
+export function CategoryPill({ category, active, preserveParams }: CategoryPillProps) {
+  const href = preserveParams
+    ? (() => {
+        const params = new URLSearchParams(preserveParams.toString())
+        params.delete("page")
+        if (category.name === "All") {
+          params.delete("category")
+        } else {
+          params.set("category", category.name)
+        }
+        const qs = params.toString()
+        return `/explore${qs ? `?${qs}` : ""}`
+      })()
+    : category.name === "All"
       ? "/explore"
       : `/explore?category=${category.name}`
 

@@ -20,9 +20,9 @@ export function PlatformFilter() {
     } else {
       params.delete("platform")
     }
-    params.delete("category")
-    params.delete("tag")
-    return `/explore?${params.toString()}`
+    params.delete("page")
+    const qs = params.toString()
+    return `/explore${qs ? `?${qs}` : ""}`
   }
 
   return (
