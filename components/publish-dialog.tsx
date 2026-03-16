@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Check,
@@ -218,6 +219,20 @@ export function PublishDialog({
         </div>
 
         {error && <p className="text-xs text-destructive">{error}</p>}
+
+        {!isPublished && (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            By publishing, you agree to our{" "}
+            <Link href="/seller-agreement" className="underline underline-offset-2 hover:text-foreground">
+              Seller Agreement
+            </Link>
+            {" and "}
+            <Link href="/acceptable-use" className="underline underline-offset-2 hover:text-foreground">
+              Acceptable Use Policy
+            </Link>
+            .
+          </p>
+        )}
 
         <DialogFooter>
           {isPublished ? (

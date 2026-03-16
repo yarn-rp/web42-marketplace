@@ -222,10 +222,10 @@ export default function DocsFaqPage() {
             <AccordionTrigger>Can buyers get a refund?</AccordionTrigger>
             <AccordionContent>
               <p className="text-muted-foreground">
-                Yes, within 7 days of purchase. Buyers can request a refund from
-                their order history. On refund, Stripe processes the return, the
-                buyer&apos;s access to the agent is revoked, and the order is
-                marked as refunded. After 7 days, sales are final.
+                Yes, within 3 days (72 hours) of purchase. Buyers can request a
+                refund from their order history. On refund, Stripe processes the
+                return, the buyer&apos;s access to the agent is revoked, and the
+                order is marked as refunded. After 72 hours, sales are final.
               </p>
             </AccordionContent>
           </AccordionItem>

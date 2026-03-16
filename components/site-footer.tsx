@@ -17,6 +17,10 @@ const resourceLinks = [
 const legalLinks = [
   { href: "/terms", label: "Terms of Service" },
   { href: "/privacy", label: "Privacy Policy" },
+  { href: "/acceptable-use", label: "Acceptable Use" },
+  { href: "/seller-agreement", label: "Seller Agreement" },
+  { href: "/dmca", label: "DMCA Policy" },
+  { href: "/disclaimer", label: "AI Disclaimer" },
 ]
 
 function FooterLinkGroup({

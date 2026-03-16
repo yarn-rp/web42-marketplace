@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useTransition } from "react"
 import { ShoppingCart, Loader2 } from "lucide-react"
@@ -70,13 +71,30 @@ export function GetAgentButton({
   }
 
   return (
-    <Button size="sm" className="gap-1.5" onClick={handleGet} disabled={isPending}>
-      {isPending ? (
-        <Loader2 className="size-4 animate-spin" />
-      ) : (
-        <ShoppingCart className="size-4" />
-      )}
-      {isPending ? (isFree ? "Getting..." : "Redirecting...") : label}
-    </Button>
+    <div className="space-y-1.5">
+      <Button size="sm" className="gap-1.5" onClick={handleGet} disabled={isPending}>
+        {isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <ShoppingCart className="size-4" />
+        )}
+        {isPending ? (isFree ? "Getting..." : "Redirecting...") : label}
+      </Button>
+      <p className="text-[10px] leading-tight text-muted-foreground">
+        {isFree ? "By acquiring this agent, you agree to our " : "By purchasing, you agree to our "}
+        <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
+          Terms of Service
+        </Link>
+        {!isFree && (
+          <>
+            {" and "}
+            <Link href="/terms#refund-policy" className="underline underline-offset-2 hover:text-foreground">
+              Refund Policy
+            </Link>
+          </>
+        )}
+        .
+      </p>
+    </div>
   )
 }

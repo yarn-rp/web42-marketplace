@@ -102,6 +102,10 @@ export function saleNotificationHtml({
               &nbsp;&middot;&nbsp;
               <a href="https://web42.ai/privacy" style="color:#505050;text-decoration:underline;">Privacy</a>
               &nbsp;&middot;&nbsp;
+              <a href="https://web42.ai/seller-agreement" style="color:#505050;text-decoration:underline;">Seller Agreement</a>
+              &nbsp;&middot;&nbsp;
+              <a href="https://web42.ai/disclaimer" style="color:#505050;text-decoration:underline;">AI Disclaimer</a>
+              &nbsp;&middot;&nbsp;
               <a href="https://web42.ai" style="color:#505050;text-decoration:underline;">web42.ai</a>
             </div>
           </td>

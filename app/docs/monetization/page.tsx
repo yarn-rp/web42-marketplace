@@ -195,15 +195,15 @@ export default function DocsMonetizationPage() {
         <p className="text-muted-foreground">
           Web42 offers a{" "}
           <span className="font-medium text-foreground">
-            7-day refund window
+            3-day (72-hour) refund window
           </span>{" "}
           from the date of purchase.
         </p>
 
         <ul className="list-inside list-disc space-y-2 text-sm text-muted-foreground">
           <li>
-            Buyers can request a refund from their order history within 7 days
-            of the original purchase.
+            Buyers can request a refund from their order history within 3 days
+            (72 hours) of the original purchase.
           </li>
           <li>
             When a refund is processed: Stripe handles the refund, the
@@ -214,7 +214,7 @@ export default function DocsMonetizationPage() {
             </code>
             .
           </li>
-          <li>After 7 days from purchase, refunds are no longer available.</li>
+          <li>After 3 days (72 hours) from purchase, refunds are no longer available.</li>
           <li>Partial refunds are not supported.</li>
         </ul>
       </section>
