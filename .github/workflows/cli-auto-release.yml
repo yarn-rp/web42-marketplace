@@ -79,3 +79,11 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "${{ steps.final.outputs.tag }}" -m "CLI v${{ steps.final.outputs.version }}"
           git push origin "${{ steps.final.outputs.tag }}"
+
+      - name: Trigger CLI Release workflow
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          gh workflow run "CLI Release" \
+            --repo "${{ github.repository }}" \
+            -f version="${{ steps.final.outputs.version }}"
