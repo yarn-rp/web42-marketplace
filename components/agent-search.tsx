@@ -2,13 +2,10 @@
 
 import { useCallback, useRef, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
+import { Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { InputButton } from "@/components/ui/input"
-
-import { IconSpinner } from "./ui/icons"
+import { Input } from "@/components/ui/input"
 
 export function AgentSearch() {
   const router = useRouter()
@@ -17,6 +14,7 @@ export function AgentSearch() {
   const [isPending, startTransition] = useTransition()
   const [value, setValue] = useState(searchParams.get("search") ?? "")
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const isExplorePage = pathname === "/explore"
 
   const navigateToExplore = useCallback(
@@ -62,18 +60,27 @@ export function AgentSearch() {
     setValue("")
     if (debounceRef.current) clearTimeout(debounceRef.current)
     navigateToExplore("")
+    inputRef.current?.focus()
   }
 
   return (
     <div className="relative w-full max-w-[42ch]">
-      <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 font-mono text-sm text-muted-foreground">
+      <span className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 font-mono text-sm text-muted-foreground">
         &gt;
       </span>
-      <InputButton
+
+      <Input
+        ref={inputRef}
+        type="text"
         id="search"
         className={cn(
-          "relative w-full py-2.5 pl-8 pr-9 text-sm font-mono shadow-sm",
-          "placeholder:text-muted-foreground"
+          "h-12 w-full rounded-full pl-9 pr-10 font-mono text-sm",
+          "border border-border/50 bg-background",
+          "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]",
+          "transition-shadow duration-200",
+          "focus-visible:ring-1 focus-visible:ring-yellow-500/30 focus-visible:ring-offset-0",
+          "focus-visible:border-yellow-500/20",
+          "placeholder:text-muted-foreground/60"
         )}
         tabIndex={0}
         value={value}
@@ -82,26 +89,23 @@ export function AgentSearch() {
         placeholder="search agents..."
         spellCheck={false}
         enterKeyHint="go"
-      >
-        <div className="relative -ml-10 hidden items-center justify-center md:flex">
-          <div className="absolute ml-4 w-14 rounded-r-full">
-            <AnimatePresence>
-              {isPending ? (
-                <IconSpinner className="-ml-0.5 h-7 w-7 animate-spin stroke-foreground/60" />
-              ) : null}
-            </AnimatePresence>
-          </div>
-        </div>
-      </InputButton>
-      {value && (
-        <button
-          type="button"
-          onClick={handleClear}
-          className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
-      )}
+        autoComplete="off"
+      />
+
+      <div className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1">
+        {isPending && (
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        )}
+        {value && !isPending && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
