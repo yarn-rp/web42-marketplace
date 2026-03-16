@@ -54,46 +54,38 @@ get_latest_version() {
 }
 
 download_binary() {
-  local version="$1" platform="$2"
+  local version="$1" platform="$2" dest="$3"
   local asset_name="${BINARY_NAME}-${platform}"
 
   info "Downloading ${BINARY_NAME} v${version} for ${platform}..."
-  local tmpdir
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
 
   if [ -n "${GITHUB_TOKEN:-}" ]; then
-    local asset_url
-    asset_url="$(curl -fsSL \
+    local release_json
+    release_json="$(curl -fsSL \
       -H "Authorization: token ${GITHUB_TOKEN}" \
       -H "Accept: application/vnd.github.v3+json" \
-      "https://api.github.com/repos/${REPO}/releases/tags/cli/v${version}" \
-      | grep -o "\"browser_download_url\":\s*\"[^\"]*${asset_name}\"" \
-      | head -1 \
-      | sed 's/.*"\(https[^"]*\)".*/\1/')"
+      "https://api.github.com/repos/${REPO}/releases/tags/cli/v${version}")" \
+      || error "Failed to fetch release info from GitHub API."
 
     local asset_id
-    asset_id="$(curl -fsSL \
-      -H "Authorization: token ${GITHUB_TOKEN}" \
-      -H "Accept: application/vnd.github.v3+json" \
-      "https://api.github.com/repos/${REPO}/releases/tags/cli/v${version}" \
+    asset_id="$(echo "$release_json" \
       | grep -B5 "\"name\":\s*\"${asset_name}\"" \
-      | grep -o '"id":\s*[0-9]*' | head -1 | grep -o '[0-9]*')"
+      | grep -o '"id":\s*[0-9]*' | head -1 | grep -o '[0-9]*')" \
+      || error "Could not find asset ${asset_name} in release."
 
     curl -fsSL \
       -H "Authorization: token ${GITHUB_TOKEN}" \
       -H "Accept: application/octet-stream" \
-      -o "${tmpdir}/${BINARY_NAME}" \
+      -o "$dest" \
       "https://api.github.com/repos/${REPO}/releases/assets/${asset_id}" \
       || error "Download failed for ${asset_name}."
   else
     local download_url="https://github.com/${REPO}/releases/download/cli/v${version}/${asset_name}"
-    curl -fsSL -o "${tmpdir}/${BINARY_NAME}" "$download_url" \
+    curl -fsSL -o "$dest" "$download_url" \
       || error "Download failed. Check that the release asset exists: ${download_url}"
   fi
 
-  chmod +x "${tmpdir}/${BINARY_NAME}"
-  echo "${tmpdir}/${BINARY_NAME}"
+  chmod +x "$dest"
 }
 
 install_binary() {
@@ -126,7 +118,12 @@ main() {
   local platform version binary_path
   platform="$(detect_platform)"
   version="$(get_latest_version)"
-  binary_path="$(download_binary "$version" "$platform")"
+
+  INSTALL_TMPDIR="$(mktemp -d)"
+  trap 'rm -rf "$INSTALL_TMPDIR"' EXIT
+  binary_path="${INSTALL_TMPDIR}/${BINARY_NAME}"
+
+  download_binary "$version" "$platform" "$binary_path"
   install_binary "$binary_path"
 
   info ""
