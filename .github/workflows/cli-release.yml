@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "cli/v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.1.0)"
+        required: true
 
 permissions:
   contents: write
@@ -18,12 +23,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract version from tag
+      - name: Extract version
         id: version
         run: |
-          TAG="${GITHUB_REF#refs/tags/cli/v}"
-          echo "version=$TAG" >> "$GITHUB_OUTPUT"
-          echo "tag=cli/v$TAG" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VER="${{ github.event.inputs.version }}"
+          else
+            VER="${GITHUB_REF#refs/tags/cli/v}"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=cli/v$VER" >> "$GITHUB_OUTPUT"
 
       - name: Verify package.json version matches tag
         working-directory: ${{ env.CLI_DIR }}
@@ -81,11 +90,14 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install dependencies and build
         working-directory: ${{ env.CLI_DIR }}
         run: |
-          npm ci
-          npm run build
+          bun install --frozen-lockfile
+          bun run build
 
       - name: Publish to npm
         working-directory: ${{ env.CLI_DIR }}
@@ -97,9 +109,14 @@ jobs:
     needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-      - name: Extract version from tag
+      - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/cli/v}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF#refs/tags/cli/v}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download release assets for checksums
         run: |
@@ -172,9 +189,14 @@ jobs:
     needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-      - name: Extract version from tag
+      - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/cli/v}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF#refs/tags/cli/v}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download Windows binary for checksum
         run: |
