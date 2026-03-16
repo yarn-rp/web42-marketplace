@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  tag-if-new:
+  tag-and-release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,23 +25,57 @@ jobs:
         working-directory: packages/cli
         run: |
           VERSION="$(node -p "require('./package.json').version")"
-          TAG="cli/v${VERSION}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Check if tag already exists
         id: check
         run: |
-          if git rev-parse "refs/tags/${{ steps.pkg.outputs.tag }}" >/dev/null 2>&1; then
+          TAG="cli/v${{ steps.pkg.outputs.version }}"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create and push tag
-        if: steps.check.outputs.exists == 'false'
+      - name: Bump patch version if tag exists
+        if: steps.check.outputs.exists == 'true'
+        id: bump
+        working-directory: packages/cli
+        run: |
+          CURRENT="${{ steps.pkg.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          node -e "
+            const pkg = require('./package.json');
+            pkg.version = '${NEW_VERSION}';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve final version
+        id: final
+        run: |
+          if [ "${{ steps.check.outputs.exists }}" = "true" ]; then
+            VERSION="${{ steps.bump.outputs.version }}"
+          else
+            VERSION="${{ steps.pkg.outputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=cli/v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        if: steps.check.outputs.exists == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.pkg.outputs.tag }}" -m "CLI v${{ steps.pkg.outputs.version }}"
-          git push origin "${{ steps.pkg.outputs.tag }}"
+          git add packages/cli/package.json
+          git commit -m "chore(cli): bump version to ${{ steps.final.outputs.version }} [skip ci]"
+          git push origin main
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.final.outputs.tag }}" -m "CLI v${{ steps.final.outputs.version }}"
+          git push origin "${{ steps.final.outputs.tag }}"
