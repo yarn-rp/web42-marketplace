@@ -11,6 +11,7 @@ import inquirer from "inquirer"
 
 import { requireAuth } from "../utils/config.js"
 import { parseSkillMd } from "../utils/skill.js"
+import { resolvePlatform, listPlatforms } from "../platforms/registry.js"
 import {
   AGENTS_MD,
   IDENTITY_MD,
@@ -46,19 +47,6 @@ function detectWorkspaceSkills(
   return skills.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-const CATEGORIES = [
-  "Customer Support",
-  "Healthcare",
-  "Developer Tools",
-  "Personal Assistant",
-  "Sales",
-  "Marketing",
-  "Education",
-  "Finance",
-  "Content Creation",
-  "Productivity",
-]
-
 export const initCommand = new Command("init")
   .description("Create a manifest.json for your agent package")
   .action(async () => {
@@ -66,6 +54,7 @@ export const initCommand = new Command("init")
     const cwd = process.cwd()
     const manifestPath = join(cwd, "manifest.json")
 
+    let existingManifest: Record<string, unknown> | null = null
     if (existsSync(manifestPath)) {
       const { overwrite } = await inquirer.prompt([
         {
@@ -79,66 +68,60 @@ export const initCommand = new Command("init")
         console.log(chalk.yellow("Aborted."))
         return
       }
+      try {
+        existingManifest = JSON.parse(readFileSync(manifestPath, "utf-8"))
+      } catch {
+        // ignore parse errors from existing manifest
+      }
     }
 
-    const answers = await inquirer.prompt([
+    const platforms = listPlatforms()
+    const { platform } = await inquirer.prompt([
       {
         type: "list",
         name: "platform",
         message: "Platform:",
-        choices: ["openclaw"],
-        default: "openclaw",
+        choices: platforms,
+        default: platforms[0],
       },
-      {
-        type: "input",
-        name: "name",
-        message: "Agent name (lowercase, hyphens allowed):",
-        validate: (val: string) =>
-          /^[a-z0-9][a-z0-9-]*$/.test(val) ||
-          "Must be lowercase alphanumeric with hyphens",
-      },
+    ])
+
+    const adapter = resolvePlatform(platform)
+    const initConfig = adapter.extractInitConfig(cwd)
+
+    if (!initConfig) {
+      console.log(
+        chalk.red(
+          `No agent entry found in ${adapter.name} config for this directory.\n` +
+          `Set up your agent in ${adapter.name} first.`
+        )
+      )
+      process.exit(1)
+    }
+
+    console.log()
+    console.log(chalk.dim(`  Agent: ${chalk.bold(initConfig.name)} (from ${adapter.name} config)`))
+    if (initConfig.model) {
+      console.log(chalk.dim(`  Model: ${initConfig.model}`))
+    }
+    console.log()
+
+    const answers = await inquirer.prompt([
       {
         type: "input",
         name: "description",
         message: "Short description:",
+        default: (existingManifest?.description as string) ?? "",
         validate: (val: string) =>
-          val.length > 0 && val.length <= 500 || "1-500 characters",
+          (val.length > 0 && val.length <= 500) || "1-500 characters",
       },
       {
         type: "input",
         name: "version",
         message: "Version:",
-        default: "1.0.0",
+        default: (existingManifest?.version as string) ?? "1.0.0",
         validate: (val: string) =>
           /^\d+\.\d+\.\d+$/.test(val) || "Must follow semver (e.g. 1.0.0)",
-      },
-      {
-        type: "list",
-        name: "category",
-        message: "Primary category:",
-        choices: CATEGORIES,
-      },
-      {
-        type: "input",
-        name: "tags",
-        message: "Tags (comma-separated):",
-        filter: (val: string) =>
-          val
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean),
-      },
-      {
-        type: "input",
-        name: "primaryModel",
-        message: "Primary model preference (e.g. claude-sonnet-4-20250514):",
-        default: "",
-      },
-      {
-        type: "input",
-        name: "demoVideoUrl",
-        message: "Demo video URL (optional):",
-        default: "",
       },
     ])
 
@@ -153,18 +136,16 @@ export const initCommand = new Command("init")
 
     const manifest = {
       format: "agentpkg/1",
-      platform: answers.platform,
-      name: answers.name,
+      platform,
+      name: initConfig.name,
       description: answers.description,
       version: answers.version,
       author: config.username,
       skills: detectedSkills,
       plugins: [] as string[],
-      modelPreferences: answers.primaryModel
-        ? { primary: answers.primaryModel }
+      modelPreferences: initConfig.model
+        ? { primary: initConfig.model }
         : undefined,
-      tags: answers.tags,
-      demoVideoUrl: answers.demoVideoUrl || undefined,
       configVariables: [] as Array<{
         key: string
         label: string

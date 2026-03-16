@@ -14,6 +14,7 @@ import { glob } from "glob"
 
 import type {
   ConfigVariable,
+  InitConfig,
   InstalledAgent,
   InstallOptions,
   InstallResult,
@@ -393,6 +394,33 @@ function mergeOpenclawConfig(
 export class OpenClawAdapter implements PlatformAdapter {
   name = "openclaw"
   home = OPENCLAW_HOME
+
+  extractInitConfig(cwd: string): InitConfig | null {
+    if (!existsSync(OPENCLAW_CONFIG_PATH)) return null
+
+    let raw: Record<string, unknown>
+    try {
+      raw = JSON.parse(readFileSync(OPENCLAW_CONFIG_PATH, "utf-8"))
+    } catch {
+      return null
+    }
+
+    const agents = raw.agents as Record<string, unknown> | undefined
+    const agentsList = agents?.list as Array<Record<string, unknown>> | undefined
+    if (!Array.isArray(agentsList) || agentsList.length === 0) return null
+
+    const agentEntry = findAgentEntry(agentsList, cwd)
+    if (!agentEntry) return null
+
+    const name = String(agentEntry.id ?? "")
+    if (!name) return null
+
+    const model =
+      (agentEntry.model as string) ??
+      ((agents?.defaults as Record<string, unknown>)?.model as Record<string, unknown>)?.primary as string | undefined
+
+    return { name, model: model || undefined }
+  }
 
   async listInstalled(): Promise<InstalledAgent[]> {
     const configPath = join(OPENCLAW_HOME, "openclaw.json")

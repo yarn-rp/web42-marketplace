@@ -53,10 +53,16 @@ export interface InstalledAgent {
   workspace: string
 }
 
+export interface InitConfig {
+  name: string
+  model?: string
+}
+
 export interface PlatformAdapter {
   name: string
   home: string
 
+  extractInitConfig(cwd: string): InitConfig | null
   pack(options: PackOptions): Promise<PackResult>
   install(options: InstallOptions): Promise<InstallResult>
   uninstall(options: UninstallOptions): Promise<UninstallResult>
