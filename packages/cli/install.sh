@@ -36,8 +36,12 @@ detect_platform() {
 
 get_latest_version() {
   local url="https://api.github.com/repos/${REPO}/releases?per_page=20"
+  local auth_header=()
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    auth_header=(-H "Authorization: token ${GITHUB_TOKEN}")
+  fi
   local response
-  response="$(curl -fsSL "$url")" || error "Failed to fetch releases from GitHub API."
+  response="$(curl -fsSL "${auth_header[@]}" "$url")" || error "Failed to fetch releases from GitHub API."
 
   local tag
   tag="$(echo "$response" | grep -o '"tag_name":\s*"cli/v[^"]*"' | head -1 | sed 's/.*"cli\/v\([^"]*\)".*/\1/')"
@@ -52,15 +56,41 @@ get_latest_version() {
 download_binary() {
   local version="$1" platform="$2"
   local asset_name="${BINARY_NAME}-${platform}"
-  local download_url="https://github.com/${REPO}/releases/download/cli/v${version}/${asset_name}"
 
   info "Downloading ${BINARY_NAME} v${version} for ${platform}..."
   local tmpdir
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' EXIT
 
-  curl -fsSL -o "${tmpdir}/${BINARY_NAME}" "$download_url" \
-    || error "Download failed. Check that the release asset exists: ${download_url}"
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    local asset_url
+    asset_url="$(curl -fsSL \
+      -H "Authorization: token ${GITHUB_TOKEN}" \
+      -H "Accept: application/vnd.github.v3+json" \
+      "https://api.github.com/repos/${REPO}/releases/tags/cli/v${version}" \
+      | grep -o "\"browser_download_url\":\s*\"[^\"]*${asset_name}\"" \
+      | head -1 \
+      | sed 's/.*"\(https[^"]*\)".*/\1/')"
+
+    local asset_id
+    asset_id="$(curl -fsSL \
+      -H "Authorization: token ${GITHUB_TOKEN}" \
+      -H "Accept: application/vnd.github.v3+json" \
+      "https://api.github.com/repos/${REPO}/releases/tags/cli/v${version}" \
+      | grep -B5 "\"name\":\s*\"${asset_name}\"" \
+      | grep -o '"id":\s*[0-9]*' | head -1 | grep -o '[0-9]*')"
+
+    curl -fsSL \
+      -H "Authorization: token ${GITHUB_TOKEN}" \
+      -H "Accept: application/octet-stream" \
+      -o "${tmpdir}/${BINARY_NAME}" \
+      "https://api.github.com/repos/${REPO}/releases/assets/${asset_id}" \
+      || error "Download failed for ${asset_name}."
+  else
+    local download_url="https://github.com/${REPO}/releases/download/cli/v${version}/${asset_name}"
+    curl -fsSL -o "${tmpdir}/${BINARY_NAME}" "$download_url" \
+      || error "Download failed. Check that the release asset exists: ${download_url}"
+  fi
 
   chmod +x "${tmpdir}/${BINARY_NAME}"
   echo "${tmpdir}/${BINARY_NAME}"

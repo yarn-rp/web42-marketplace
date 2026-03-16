@@ -119,12 +119,14 @@ jobs:
           fi
 
       - name: Download release assets for checksums
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          BASE_URL="https://github.com/yarn-rp/web42-marketplace/releases/download/cli/v${VERSION}"
-          curl -fsSL -o web42-linux-x64 "${BASE_URL}/web42-linux-x64"
-          curl -fsSL -o web42-darwin-x64 "${BASE_URL}/web42-darwin-x64"
-          curl -fsSL -o web42-darwin-arm64 "${BASE_URL}/web42-darwin-arm64"
+          gh release download "cli/v${{ steps.version.outputs.version }}" \
+            --repo yarn-rp/web42-marketplace \
+            --pattern "web42-linux-x64" \
+            --pattern "web42-darwin-x64" \
+            --pattern "web42-darwin-arm64"
 
       - name: Compute SHA256 checksums
         id: sha
@@ -199,10 +201,12 @@ jobs:
           fi
 
       - name: Download Windows binary for checksum
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          curl -fsSL -o web42-windows-x64.exe \
-            "https://github.com/yarn-rp/web42-marketplace/releases/download/cli/v${VERSION}/web42-windows-x64.exe"
+          gh release download "cli/v${{ steps.version.outputs.version }}" \
+            --repo yarn-rp/web42-marketplace \
+            --pattern "web42-windows-x64.exe"
 
       - name: Compute SHA256
         id: sha
