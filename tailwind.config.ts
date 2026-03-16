@@ -64,11 +64,23 @@ const config = {
   				DEFAULT: 'hsl(var(--popover))',
   				foreground: 'hsl(var(--popover-foreground))'
   			},
-  			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
-  			},
-  			base: {
+			card: {
+				DEFAULT: 'hsl(var(--card))',
+				foreground: 'hsl(var(--card-foreground))'
+			},
+			terminal: {
+				background: 'var(--terminal-background)',
+				titlebar: 'var(--terminal-titlebar)',
+				body: 'var(--terminal-body)',
+				border: 'var(--terminal-border)',
+				muted: 'var(--terminal-muted)',
+				foreground: 'var(--terminal-foreground)',
+				green: 'var(--terminal-green)',
+				cyan: 'var(--terminal-cyan)',
+				yellow: 'var(--terminal-yellow)',
+				purple: 'var(--terminal-purple)'
+			},
+			base: {
   				'25': '#FAFAFA',
   				'50': '#F5F5F5',
   				'100': '#EAEAEA',

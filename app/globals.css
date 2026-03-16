@@ -39,6 +39,17 @@
     --background: 0 0% 4%;
     --foreground: 0 0% 93%;
 
+    --terminal-background: #1A1A1A;
+    --terminal-titlebar: #1F1F1F;
+    --terminal-body: #2A2A2A;
+    --terminal-border: #2E2E2E;
+    --terminal-muted: #505050;
+    --terminal-foreground: #D8DEE9;
+    --terminal-green: #A3BE8C;
+    --terminal-cyan: #83D6C5;
+    --terminal-yellow: #EBC88D;
+    --terminal-purple: #AA9BF5;
+
     --card: 0 0% 6%;
     --card-foreground: 0 0% 93%;
 

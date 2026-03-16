@@ -22,7 +22,7 @@ function highlightCommand(text: string): ReactNode {
     }
     if (idx > 0) parts.push(remaining.slice(0, idx))
     parts.push(
-      <span key={parts.length} className="text-green-600 dark:text-green-400">
+      <span key={parts.length} className="text-green-600 dark:text-terminal-green">
         web42
       </span>
     )
@@ -42,17 +42,17 @@ export function TerminalLine({ prefix, children, className }: TerminalLineProps)
         className={cn(
           "select-none",
           isOutput
-            ? "text-green-600 dark:text-green-400"
-            : "text-zinc-400 dark:text-zinc-500"
+            ? "text-green-600 dark:text-terminal-green"
+            : "text-zinc-400 dark:text-terminal-muted"
         )}
       >
         {prefix}
       </span>
       <span
         className={cn(
-          isComment && "text-zinc-400 dark:text-zinc-600",
-          isOutput && "text-zinc-500 dark:text-zinc-400",
-          !isComment && !isOutput && "text-zinc-800 dark:text-zinc-300"
+          isComment && "text-zinc-400 dark:text-terminal-muted",
+          isOutput && "text-zinc-500 dark:text-terminal-muted",
+          !isComment && !isOutput && "text-zinc-800 dark:text-terminal-foreground"
         )}
       >
         {!isComment && !isOutput ? highlightCommand(children) : children}

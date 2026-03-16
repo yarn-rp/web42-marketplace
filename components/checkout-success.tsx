@@ -109,10 +109,10 @@ export function CheckoutSuccess({
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="relative z-10 mx-4 w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200 shadow-2xl dark:border-[#2a2b3d]"
+        className="relative z-10 mx-4 w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200 shadow-2xl dark:border-terminal-border"
       >
         {/* Title bar */}
-        <div className="flex items-center gap-2 border-b border-zinc-200 bg-zinc-100 px-4 py-3 dark:border-[#2a2b3d] dark:bg-[#16161e]">
+        <div className="flex items-center gap-2 border-b border-zinc-200 bg-zinc-100 px-4 py-3 dark:border-terminal-border dark:bg-terminal-titlebar">
           <div className="flex gap-1.5">
             <button
               onClick={handleClose}
@@ -126,23 +126,23 @@ export function CheckoutSuccess({
             <span className="size-3 rounded-full bg-[#febc2e]" />
             <span className="size-3 rounded-full bg-[#28c840]" />
           </div>
-          <span className="ml-2 font-mono text-xs text-zinc-400 dark:text-zinc-500">
+          <span className="ml-2 font-mono text-xs text-zinc-400 dark:text-terminal-muted">
             web42
           </span>
         </div>
 
         {/* Terminal body */}
-        <div className="bg-white p-5 font-mono text-sm dark:bg-[#1a1b26]">
+        <div className="bg-white p-5 font-mono text-sm dark:bg-terminal-body">
           {/* Typing animation */}
           <div className="min-h-[160px] space-y-1 leading-relaxed">
             {visibleLines.map((line, i) => (
               <div
                 key={i}
                 className={cn(
-                  i === 0 && "text-zinc-400 dark:text-zinc-500",
-                  line.startsWith(">") && "text-emerald-600 dark:text-emerald-400",
-                  line.startsWith("✓") && "font-semibold text-emerald-600 dark:text-emerald-400",
-                  !line.startsWith(">") && !line.startsWith("✓") && i !== 0 && "text-zinc-700 dark:text-zinc-300"
+                  i === 0 && "text-zinc-400 dark:text-terminal-muted",
+                  line.startsWith(">") && "text-emerald-600 dark:text-terminal-green",
+                  line.startsWith("✓") && "font-semibold text-emerald-600 dark:text-terminal-green",
+                  !line.startsWith(">") && !line.startsWith("✓") && i !== 0 && "text-zinc-700 dark:text-terminal-foreground"
                 )}
               >
                 {line || "\u00A0"}
@@ -162,25 +162,25 @@ export function CheckoutSuccess({
                 transition={{ duration: 0.4, delay: 0.15 }}
                 className="mt-4 space-y-3"
               >
-                <div className="h-px bg-zinc-200 dark:bg-[#2a2b3d]" />
+                <div className="h-px bg-zinc-200 dark:bg-terminal-border" />
 
                 {/* Install command */}
                 <div className="space-y-1.5">
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                  <span className="text-xs text-zinc-400 dark:text-terminal-muted">
                     install on your setup:
                   </span>
                   <div className="group flex items-center gap-2">
-                    <span className="text-zinc-400 dark:text-zinc-500">$</span>
-                    <code className="flex-1 truncate text-zinc-700 dark:text-zinc-300">
+                    <span className="text-zinc-400 dark:text-terminal-muted">$</span>
+                    <code className="flex-1 truncate text-zinc-700 dark:text-terminal-foreground">
                       {installCommand}
                     </code>
                     <button
                       onClick={handleCopy}
-                      className="shrink-0 rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-500 dark:hover:bg-[#2a2b3d] dark:hover:text-zinc-300"
+                      className="shrink-0 rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:text-terminal-muted dark:hover:bg-terminal-border dark:hover:text-terminal-foreground"
                       aria-label="Copy install command"
                     >
                       {copied ? (
-                        <Check className="size-3.5 text-emerald-500" />
+                        <Check className="size-3.5 text-terminal-green" />
                       ) : (
                         <Copy className="size-3.5" />
                       )}
@@ -189,11 +189,11 @@ export function CheckoutSuccess({
                 </div>
 
                 {/* Creator note */}
-                <div className="text-xs italic text-zinc-400 dark:text-zinc-500">
+                <div className="text-xs italic text-zinc-400 dark:text-terminal-muted">
                   Thanks for supporting @{username} ♥
                 </div>
 
-                <div className="h-px bg-zinc-200 dark:bg-[#2a2b3d]" />
+                <div className="h-px bg-zinc-200 dark:bg-terminal-border" />
 
                 {/* Actions as terminal links */}
                 <div className="flex items-center gap-4 text-xs">
@@ -207,7 +207,7 @@ export function CheckoutSuccess({
                   )}
                   <button
                     onClick={handleClose}
-                    className="text-zinc-400 transition-colors hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                    className="text-zinc-400 transition-colors hover:text-zinc-600 dark:text-terminal-muted dark:hover:text-terminal-foreground"
                   >
                     close
                   </button>

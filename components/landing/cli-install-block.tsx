@@ -15,12 +15,12 @@ interface Token {
 }
 
 const TOKEN_COLORS: Record<TokenType, string> = {
-  cmd: "text-green-600 dark:text-green-400",
-  flag: "text-yellow-600 dark:text-yellow-400",
-  url: "text-cyan-600/80 dark:text-cyan-400/80",
-  pkg: "text-purple-600 dark:text-purple-400",
-  pipe: "text-zinc-400 dark:text-zinc-500",
-  plain: "text-zinc-700 dark:text-zinc-300",
+  cmd: "text-green-600 dark:text-terminal-green",
+  flag: "text-yellow-600 dark:text-terminal-yellow",
+  url: "text-cyan-600/80 dark:text-terminal-cyan",
+  pkg: "text-purple-600 dark:text-terminal-purple",
+  pipe: "text-zinc-400 dark:text-terminal-muted",
+  plain: "text-zinc-700 dark:text-terminal-foreground",
 }
 
 interface InstallMethod {
@@ -121,15 +121,15 @@ function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       className={cn(
-        "shrink-0 rounded p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10",
-        copied && "text-zinc-800 dark:text-zinc-200"
+        "shrink-0 rounded p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-terminal-border",
+        copied && "text-zinc-800 dark:text-terminal-foreground"
       )}
       aria-label="Copy to clipboard"
     >
-      {copied ? (
-        <Check className="size-3.5 text-green-600 dark:text-green-400" />
+        {copied ? (
+        <Check className="size-3.5 text-green-600 dark:text-terminal-green" />
       ) : (
-        <Copy className="size-3.5 text-zinc-400 dark:text-zinc-500" />
+        <Copy className="size-3.5 text-zinc-400 dark:text-terminal-muted" />
       )}
     </button>
   )
@@ -158,7 +158,7 @@ export function CliInstallBlock({
       <TerminalWindow title={title} className={className}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 gap-2">
-            <span className="select-none text-zinc-400 dark:text-zinc-500">$</span>
+            <span className="select-none text-zinc-400 dark:text-terminal-muted">$</span>
             <HighlightedCommand tokens={primary.tokens} />
           </div>
           <CopyButton text={primary.command} />
@@ -170,12 +170,12 @@ export function CliInstallBlock({
   return (
     <TerminalWindow title={title} className={className}>
       <Tabs defaultValue={defaultTab} key={defaultTab}>
-        <TabsList className="mb-3 h-8 w-full rounded-md border border-zinc-200 bg-zinc-100 p-0.5 dark:border-white/5 dark:bg-white/5">
+        <TabsList className="mb-3 h-8 w-full rounded-md border border-zinc-200 bg-zinc-100 p-0.5 dark:border-terminal-border dark:bg-terminal-titlebar">
           {INSTALL_METHODS.map((m) => (
             <TabsTrigger
               key={m.id}
               value={m.id}
-              className="flex-1 rounded px-2 py-1 text-xs text-zinc-500 transition-colors data-[state=active]:bg-white data-[state=active]:text-zinc-900 data-[state=active]:shadow-sm dark:text-zinc-500 dark:data-[state=active]:bg-white/10 dark:data-[state=active]:text-zinc-200 dark:data-[state=active]:shadow-none"
+              className="flex-1 rounded px-2 py-1 text-xs text-zinc-500 transition-colors data-[state=active]:bg-white data-[state=active]:text-zinc-900 data-[state=active]:shadow-sm dark:text-terminal-muted dark:data-[state=active]:bg-terminal-border dark:data-[state=active]:text-terminal-foreground dark:data-[state=active]:shadow-none"
             >
               {m.label}
             </TabsTrigger>
@@ -185,7 +185,7 @@ export function CliInstallBlock({
           <TabsContent key={m.id} value={m.id} className="mt-0">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 gap-2">
-                <span className="select-none text-zinc-400 dark:text-zinc-500">$</span>
+                <span className="select-none text-zinc-400 dark:text-terminal-muted">$</span>
                 <HighlightedCommand tokens={m.tokens} />
               </div>
               <CopyButton text={m.command} />
