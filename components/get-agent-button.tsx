@@ -13,12 +13,14 @@ interface GetAgentButtonProps {
   agentId: string
   priceCents: number
   isAuthenticated: boolean
+  onSuccess?: () => void
 }
 
 export function GetAgentButton({
   agentId,
   priceCents,
   isAuthenticated,
+  onSuccess,
 }: GetAgentButtonProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -45,7 +47,7 @@ export function GetAgentButton({
           toast.error(result.error)
           return
         }
-        router.refresh()
+        onSuccess?.()
       } else {
         try {
           const res = await fetch("/api/stripe/checkout", {
@@ -71,7 +73,7 @@ export function GetAgentButton({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col items-end space-y-1.5 text-right">
       <Button size="sm" className="gap-1.5" onClick={handleGet} disabled={isPending}>
         {isPending ? (
           <Loader2 className="size-4 animate-spin" />

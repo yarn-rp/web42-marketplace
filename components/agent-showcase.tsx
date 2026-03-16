@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   CalendarIcon,
   Download,
@@ -65,12 +66,14 @@ export function AgentShowcase({
   checkoutSuccess = false,
   currentUsername,
 }: AgentShowcaseProps) {
+  const router = useRouter()
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
   const platformInfo = getPlatform(agent.manifest?.platform)
 
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [galleryIndex, setGalleryIndex] = useState(0)
+  const [freeAcquireSuccess, setFreeAcquireSuccess] = useState(false)
 
   const openGallery = (index: number) => {
     setGalleryIndex(index)
@@ -79,13 +82,22 @@ export function AgentShowcase({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
-      {checkoutSuccess && (
+      {(checkoutSuccess || freeAcquireSuccess) && (
         <CheckoutSuccess
           agentName={agent.name}
           agentSlug={agent.slug}
           username={username}
           platform={agent.manifest?.platform}
           currentUsername={currentUsername}
+          isFree={freeAcquireSuccess}
+          onClose={
+            freeAcquireSuccess
+              ? () => {
+                  setFreeAcquireSuccess(false)
+                  router.refresh()
+                }
+              : undefined
+          }
         />
       )}
 
@@ -145,6 +157,11 @@ export function AgentShowcase({
                 agentId={agent.id}
                 priceCents={agent.price_cents ?? 0}
                 isAuthenticated={isAuthenticated}
+                onSuccess={
+                  (agent.price_cents ?? 0) === 0
+                    ? () => setFreeAcquireSuccess(true)
+                    : undefined
+                }
               />
             )}
           </div>
