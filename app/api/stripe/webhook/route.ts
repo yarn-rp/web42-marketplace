@@ -185,6 +185,7 @@ async function sendPurchaseEmails(
         buyerUsername,
         buyerEmail,
         agentName,
+        agentUrl,
         amountCents,
         sellerAmountCents,
       }),

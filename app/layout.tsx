@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { TopNav } from "@/components/top-nav"
 import { SiteFooter } from "@/components/site-footer"
 
+import { Analytics } from "@vercel/analytics/react"
 import { ThemeProvider } from "./providers"
 import { getCurrentProfile } from "./actions/profile"
 
@@ -83,6 +84,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <SiteFooter />
           </TooltipProvider>
           <Toaster richColors />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
