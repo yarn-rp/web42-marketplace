@@ -97,6 +97,7 @@ jobs:
         working-directory: ${{ env.CLI_DIR }}
         run: |
           bun install --frozen-lockfile
+          bash scripts/sync-version.sh
           bun run build
 
       - name: Publish to npm
