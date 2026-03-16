@@ -81,7 +81,20 @@ export function LoginForm() {
         return
       }
 
-      router.push("/")
+      if (cliCode) {
+        const res = await fetch("/api/auth/cli/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: cliCode }),
+        })
+        if (res.ok) {
+          router.push("/login/cli-success")
+        } else {
+          router.push("/")
+        }
+      } else {
+        router.push("/")
+      }
       router.refresh()
     } finally {
       setLoading(false)
