@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "fs"
 import { basename, join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
