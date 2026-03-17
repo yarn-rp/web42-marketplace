@@ -4,7 +4,7 @@ Before packing, audit the workspace for files that should not ship to buyers. Th
 
 ## Automatically Excluded by the CLI
 
-These patterns are hardcoded in the pack command and will never appear in the `.web42/` artifact:
+These patterns are hardcoded in the pack command and will never appear in the `.web42/dist/` artifact:
 
 | Pattern | Reason |
 |---------|--------|
@@ -18,10 +18,25 @@ These patterns are hardcoded in the pack command and will never appear in the `.
 | `*.log` | Log files |
 | `openclaw.json` | Platform config (contains agent bindings, channel secrets) |
 | `.openclaw/credentials/**` | Platform credentials |
-| `.web42/**` | Previous pack artifacts |
+| `.web42/**` | Metadata folder (marketplace config, sync state, pack output) |
 | `.web42ignore` | Pack ignore config (meta, not content) |
 | `manifest.json` | Shipped separately as structured data |
 | `USER.md` | Always rewritten with a blank template on install |
+
+## `.web42/` Metadata Files (Not Packed)
+
+The `.web42/` folder contains metadata and assets that are synced separately — they are NOT included in the packed agent files:
+
+| File | Purpose | Editable? |
+|------|---------|-----------|
+| `marketplace.json` | Pricing, license, tags | Yes |
+| `resources.json` | Resource file metadata | Yes |
+| `avatar.*` | Agent profile image | Yes |
+| `resources/` | Screenshots, videos, documents | Yes |
+| `sync.json` | Sync state tracking | No — auto-managed |
+| `dist/` | Pack output | No — auto-generated |
+
+**`sync.json`** should never be edited manually. Doing so will break change detection between local and remote. It is safe to delete if you want to force a full re-sync.
 
 ## Files to Flag for Manual Review
 
@@ -53,7 +68,7 @@ These are NOT auto-excluded but often contain content that should not ship:
 
 - The pack command skips files larger than 1 MB.
 - Binary files (images, compiled executables) are skipped automatically (UTF-8 decode failure).
-- If the agent needs images (e.g., for the README cover), use `coverImage` in the manifest or host them externally.
+- If the agent needs images (e.g., for the README cover), host them externally or manage them as resources in `.web42/resources/`.
 
 ## Using `.web42ignore`
 

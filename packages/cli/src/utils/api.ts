@@ -42,3 +42,37 @@ export async function apiPost<T>(path: string, data: unknown): Promise<T> {
   }
   return res.json()
 }
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await apiRequest(path, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `API error: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function apiFormData<T>(
+  path: string,
+  formData: FormData
+): Promise<T> {
+  const config = getConfig()
+  const url = `${config.apiUrl}${path}`
+
+  const headers: Record<string, string> = {}
+  if (config.token) {
+    headers["Authorization"] = `Bearer ${config.token}`
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `API error: ${res.status}`)
+  }
+  return res.json()
+}

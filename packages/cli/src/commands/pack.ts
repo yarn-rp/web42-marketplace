@@ -9,7 +9,7 @@ import { parseSkillMd } from "../utils/skill.js"
 
 export const packCommand = new Command("pack")
   .description("Pack your agent workspace into a distributable artifact")
-  .option("-o, --output <dir>", "Output directory", ".web42")
+  .option("-o, --output <dir>", "Output directory", ".web42/dist")
   .option("--dry-run", "Preview what would be packed without writing files")
   .action(async (opts: { output: string; dryRun?: boolean }) => {
     const cwd = process.cwd()

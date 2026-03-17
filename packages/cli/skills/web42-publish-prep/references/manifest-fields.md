@@ -75,12 +75,14 @@ Searchable labels for marketplace discoverability.
 - **Good:** `["support", "crm", "slack", "weekly-reports"]`
 - **Bad:** `["ai", "agent", "good"]` (too generic)
 - **Guidance:** 3–6 tags. Think about what a buyer would search for. Mix category terms ("support", "finance") with capability terms ("slack-integration", "pdf-generation").
+- **Note:** Tags are also specified in `.web42/marketplace.json`. The marketplace.json tags are the canonical source that gets synced to the remote. If tags exist in both files, the marketplace.json values take precedence during sync. See `references/marketplace-config.md`.
 
 ### `coverImage` (string)
 
 Path to a cover image file, relative to workspace root.
 
-- **Guidance:** Optional but recommended. A good cover image dramatically improves click-through on the marketplace. Use a 1200x630 or 1200x1200 image.
+- **Guidance:** Optional. A good cover image dramatically improves click-through on the marketplace. Use a 1200x630 or 1200x1200 image.
+- **Note:** For the marketplace listing, the primary visual asset is now the agent avatar at `.web42/avatar.*` and resources in `.web42/resources/`. The `coverImage` manifest field is still supported for backward compatibility but resources are the preferred approach. See `references/resources-guide.md`.
 
 ### `demoVideoUrl` (string)
 
@@ -88,6 +90,7 @@ URL to a demo video.
 
 - **Constraints:** Must be a valid URL.
 - **Guidance:** A 1–3 minute video showing the agent in action converts far better than text alone. Host on YouTube, Loom, or similar.
+- **Note:** Demo videos can also be managed as resources in `.web42/resources/` with type `"video"`. Resources are uploaded directly to the marketplace. Use `demoVideoUrl` for externally hosted videos (YouTube, Loom) or `.web42/resources/` for self-hosted files. See `references/resources-guide.md`.
 
 ### `configVariables` (array)
 

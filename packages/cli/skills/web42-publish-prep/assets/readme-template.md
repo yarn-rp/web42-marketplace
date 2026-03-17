@@ -3,12 +3,12 @@
 <!-- 
   This is a starting point, not a form. Rewrite it, restructure it, make it yours.
   The marketplace renders full Markdown — use it. GIFs, videos, screenshots, emoji, whatever tells your story.
+  
+  Screenshots and demo media are managed in .web42/resources/ and appear automatically on the listing.
+  The README is for the narrative — let the resources handle the visuals.
 -->
 
 {A bold opening line. What changes for the user when they have you? Don't describe yourself — describe the outcome.}
-
-<!-- Optional: embed a GIF or demo video here -->
-<!-- ![Demo](https://your-demo-url.gif) -->
 
 ---
 
@@ -26,7 +26,7 @@
 
 <!-- Replace these with real scenarios that match what you actually do. -->
 
-## Quickstart
+## Install
 
 ```bash
 web42 openclaw install @{author}/{name}
@@ -40,7 +40,7 @@ web42 openclaw install @{author}/{name}
 
 | Variable | What It Is | Where to Get It |
 |----------|-----------|-----------------|
-| `EXAMPLE_API_KEY` | Access token for Example API | [Example Dashboard → Settings → API](https://example.com/settings) |
+| `EXAMPLE_API_KEY` | Access token for Example API | [Example Dashboard > Settings > API](https://example.com/settings) |
 
 <!-- Remove this section entirely if the agent needs no configuration. -->
 
@@ -54,4 +54,8 @@ web42 openclaw install @{author}/{name}
   - "Credits" (shoutouts, inspirations)
   
   Or make up your own sections. There are no rules here.
+  
+  Tip: Your screenshots and demo video in .web42/resources/ will appear 
+  on the marketplace listing alongside this README. Focus the README on 
+  the story and let the media speak for the visual side.
 -->

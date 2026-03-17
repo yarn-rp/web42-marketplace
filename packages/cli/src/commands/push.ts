@@ -1,59 +1,45 @@
-import { createHash } from "crypto"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  writeFileSync,
-} from "fs"
-import { join, relative } from "path"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
+import { basename, join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
 import ora from "ora"
 
-import { apiPost } from "../utils/api.js"
+import { apiPost, apiFormData } from "../utils/api.js"
 import { requireAuth } from "../utils/config.js"
 import { openclawAdapter } from "../platforms/openclaw/adapter.js"
 import { parseSkillMd } from "../utils/skill.js"
+import {
+  buildLocalSnapshot,
+  computeHashFromSnapshot,
+  findLocalAvatar,
+  readResourcesMeta,
+  readSyncState,
+  writeSyncState,
+} from "../utils/sync.js"
+import type {
+  SyncPushResponse,
+  AvatarUploadResponse,
+  ResourcesUploadResponse,
+} from "../types/sync.js"
 
-function hashContent(content: string): string {
-  return createHash("sha256").update(content).digest("hex")
-}
-
-function readPackedFiles(
-  dir: string
-): Array<{ path: string; content: string; hash: string }> {
-  const files: Array<{ path: string; content: string; hash: string }> = []
-
-  function walk(currentDir: string) {
-    const entries = readdirSync(currentDir, { withFileTypes: true })
-    for (const entry of entries) {
-      const fullPath = join(currentDir, entry.name)
-      if (entry.isDirectory()) {
-        walk(fullPath)
-      } else {
-        if (entry.name === "manifest.json" && currentDir === dir) continue
-        const stat = statSync(fullPath)
-        if (stat.size > 1024 * 1024) continue
-        try {
-          const content = readFileSync(fullPath, "utf-8")
-          const relPath = relative(dir, fullPath)
-          files.push({ path: relPath, content, hash: hashContent(content) })
-        } catch {
-          // Skip binary files
-        }
-      }
-    }
+function mimeFromExtension(ext: string): string {
+  const map: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    mp4: "video/mp4",
+    webm: "video/webm",
+    pdf: "application/pdf",
   }
-
-  walk(dir)
-  return files
+  return map[ext.toLowerCase()] ?? "application/octet-stream"
 }
 
 export const pushCommand = new Command("push")
   .description("Push your agent package to the Web42 marketplace")
-  .action(async () => {
+  .option("--force", "Skip hash comparison and always push")
+  .action(async (opts: { force?: boolean }) => {
     const config = requireAuth()
     const cwd = process.cwd()
     const manifestPath = join(cwd, "manifest.json")
@@ -78,27 +64,31 @@ export const pushCommand = new Command("push")
 
     const spinner = ora("Preparing agent package...").start()
 
-    const web42Dir = join(cwd, ".web42")
-    let processedFiles: Array<{ path: string; content: string; hash: string }>
+    // -----------------------------------------------------------------------
+    // Step 1: Pack into .web42/dist/
+    // -----------------------------------------------------------------------
+    const distDir = join(cwd, ".web42", "dist")
 
-    if (existsSync(web42Dir)) {
-      spinner.text = "Reading packed artifact..."
-      processedFiles = readPackedFiles(web42Dir)
-
-      const packedManifestPath = join(web42Dir, "manifest.json")
+    if (existsSync(distDir)) {
+      spinner.text = "Reading packed artifact from .web42/dist/..."
+      const packedManifestPath = join(distDir, "manifest.json")
       if (existsSync(packedManifestPath)) {
         manifest = JSON.parse(readFileSync(packedManifestPath, "utf-8"))
       }
     } else {
-      spinner.text = "No .web42/ found, packing automatically..."
-      const result = await openclawAdapter.pack({ cwd, outputDir: ".web42" })
+      spinner.text = "Packing agent into .web42/dist/..."
+      const result = await openclawAdapter.pack({
+        cwd,
+        outputDir: ".web42/dist",
+      })
 
       const internalPrefixes: string[] = []
       for (const f of result.files) {
         const skillMatch = f.path.match(/^skills\/([^/]+)\/SKILL\.md$/)
         if (skillMatch) {
           const parsed = parseSkillMd(f.content, skillMatch[1])
-          if (parsed.internal) internalPrefixes.push(`skills/${skillMatch[1]}/`)
+          if (parsed.internal)
+            internalPrefixes.push(`skills/${skillMatch[1]}/`)
         }
       }
       if (internalPrefixes.length > 0) {
@@ -106,8 +96,6 @@ export const pushCommand = new Command("push")
           (f) => !internalPrefixes.some((p) => f.path.startsWith(p))
         )
       }
-
-      processedFiles = result.files
 
       const existingKeys = new Set(
         (manifest.configVariables ?? []).map((v: { key: string }) => v.key)
@@ -120,56 +108,157 @@ export const pushCommand = new Command("push")
         }
       }
 
-      mkdirSync(web42Dir, { recursive: true })
+      mkdirSync(distDir, { recursive: true })
       for (const file of result.files) {
-        const filePath = join(web42Dir, file.path)
+        const filePath = join(distDir, file.path)
         mkdirSync(join(filePath, ".."), { recursive: true })
         writeFileSync(filePath, file.content, "utf-8")
       }
       writeFileSync(
-        join(web42Dir, "manifest.json"),
+        join(distDir, "manifest.json"),
         JSON.stringify(manifest, null, 2) + "\n"
       )
     }
 
-    spinner.text = `Pushing ${processedFiles.length} files...`
+    // -----------------------------------------------------------------------
+    // Step 2: Resolve agent ID (create if first push)
+    // -----------------------------------------------------------------------
+    spinner.text = "Resolving agent..."
 
-    let readme = ""
-    const readmePath = join(cwd, "README.md")
-    if (existsSync(readmePath)) {
-      readme = readFileSync(readmePath, "utf-8")
-    }
+    let syncState = readSyncState(cwd)
+    let agentId = syncState?.agent_id ?? null
+    let isCreated = false
 
-    try {
+    if (!agentId) {
+      let readme = ""
+      const readmePath = join(cwd, "README.md")
+      if (existsSync(readmePath)) {
+        readme = readFileSync(readmePath, "utf-8")
+      }
+
       const agentResult = await apiPost<{
         agent: { id: string }
         created?: boolean
-        updated?: boolean
+        hash?: string
       }>("/api/agents", {
         slug: manifest.name,
         name: manifest.name,
-        description: manifest.description,
+        description: manifest.description ?? "",
         readme,
         manifest,
         demo_video_url: manifest.demoVideoUrl,
       })
 
-      const agentId = agentResult.agent.id
+      agentId = agentResult.agent.id
+      isCreated = !!agentResult.created
+    }
 
-      const fileEntries = processedFiles.map((f) => ({
-        path: f.path,
-        content: f.content,
-        content_hash: f.hash,
-        storage_url: `agent-files/${config.username}/${manifest.name}/${f.path}`,
-      }))
+    // -----------------------------------------------------------------------
+    // Step 3: Build local snapshot and compute hash
+    // -----------------------------------------------------------------------
+    spinner.text = "Building snapshot..."
+    const snapshot = buildLocalSnapshot(cwd)
 
-      await apiPost(`/api/agents/${agentId}/files`, { files: fileEntries })
+    const localHash = computeHashFromSnapshot(snapshot)
 
-      spinner.succeed(
-        `Pushed ${chalk.bold(`@${config.username}/${manifest.name}`)} (${processedFiles.length} files)`
+    // -----------------------------------------------------------------------
+    // Step 4: Compare local hash with last known local hash (unless --force)
+    // -----------------------------------------------------------------------
+    if (!opts.force && !isCreated && syncState?.last_local_hash) {
+      if (localHash === syncState.last_local_hash) {
+        spinner.succeed(
+          `${chalk.bold(`@${config.username}/${manifest.name}`)} has no local changes since last sync.`
+        )
+        return
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 5: Push snapshot
+    // -----------------------------------------------------------------------
+    spinner.text = `Pushing ${snapshot.files.length} files...`
+
+    try {
+      const pushResult = await apiPost<SyncPushResponse>(
+        `/api/agents/${agentId}/sync/push`,
+        snapshot
       )
 
-      if (agentResult.created) {
+      let finalHash = pushResult.hash
+
+      // -------------------------------------------------------------------
+      // Step 6: Upload avatar if present
+      // -------------------------------------------------------------------
+      const avatarPath = findLocalAvatar(cwd)
+      if (avatarPath) {
+        spinner.text = "Uploading avatar..."
+        const ext = avatarPath.split(".").pop() ?? "png"
+        const avatarBuffer = readFileSync(avatarPath)
+        const avatarBlob = new Blob([avatarBuffer], {
+          type: mimeFromExtension(ext),
+        })
+        const avatarForm = new FormData()
+        avatarForm.append("avatar", avatarBlob, `avatar.${ext}`)
+
+        const avatarResult = await apiFormData<AvatarUploadResponse>(
+          `/api/agents/${agentId}/sync/avatar`,
+          avatarForm
+        )
+        finalHash = avatarResult.hash
+      }
+
+      // -------------------------------------------------------------------
+      // Step 7: Upload resources if present
+      // -------------------------------------------------------------------
+      const resourcesMeta = readResourcesMeta(cwd)
+      if (resourcesMeta.length > 0) {
+        spinner.text = "Uploading resources..."
+        const resForm = new FormData()
+
+        const metadataForApi = resourcesMeta.map((meta, i) => ({
+          file_key: `resource_${i}`,
+          title: meta.title,
+          description: meta.description,
+          type: meta.type,
+          sort_order: meta.sort_order,
+        }))
+        resForm.append("metadata", JSON.stringify(metadataForApi))
+
+        for (let i = 0; i < resourcesMeta.length; i++) {
+          const meta = resourcesMeta[i]
+          const resFilePath = join(cwd, ".web42", "resources", meta.file)
+          if (existsSync(resFilePath)) {
+            const resBuffer = readFileSync(resFilePath)
+            const ext = meta.file.split(".").pop() ?? ""
+            const blob = new Blob([resBuffer], {
+              type: mimeFromExtension(ext),
+            })
+            resForm.append(`resource_${i}`, blob, meta.file)
+          }
+        }
+
+        const resResult = await apiFormData<ResourcesUploadResponse>(
+          `/api/agents/${agentId}/sync/resources`,
+          resForm
+        )
+        finalHash = resResult.hash
+      }
+
+      // -------------------------------------------------------------------
+      // Step 8: Save sync state
+      // -------------------------------------------------------------------
+      writeSyncState(cwd, {
+        agent_id: agentId,
+        last_remote_hash: finalHash,
+        last_local_hash: localHash,
+        synced_at: new Date().toISOString(),
+      })
+
+      spinner.succeed(
+        `Pushed ${chalk.bold(`@${config.username}/${manifest.name}`)} (${snapshot.files.length} files)`
+      )
+
+      if (isCreated) {
         console.log(chalk.green("  New agent created!"))
       } else {
         console.log(chalk.green("  Agent updated."))
@@ -180,6 +269,7 @@ export const pushCommand = new Command("push")
           `  View at: ${config.apiUrl ? config.apiUrl.replace("https://", "") : "web42.ai"}/${config.username}/${manifest.name}`
         )
       )
+      console.log(chalk.dim(`  Sync hash: ${finalHash.slice(0, 12)}...`))
     } catch (error: any) {
       spinner.fail("Push failed")
       console.error(chalk.red(error.message))

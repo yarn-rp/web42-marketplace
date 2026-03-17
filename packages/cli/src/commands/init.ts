@@ -1,5 +1,6 @@
 import {
   writeFileSync,
+  mkdirSync,
   existsSync,
   readdirSync,
   readFileSync,
@@ -13,6 +14,8 @@ import { requireAuth } from "../utils/config.js"
 import { parseSkillMd } from "../utils/skill.js"
 import { listBundledSkills, copySkillToWorkspace } from "../utils/bundled-skills.js"
 import { resolvePlatform, listPlatforms } from "../platforms/registry.js"
+import { writeMarketplace, writeResourcesMeta } from "../utils/sync.js"
+import { DEFAULT_MARKETPLACE } from "../types/sync.js"
 import {
   AGENTS_MD,
   IDENTITY_MD,
@@ -202,6 +205,36 @@ export const initCommand = new Command("init")
       )
     }
 
+    // Scaffold .web42/ metadata folder
+    const web42Dir = join(cwd, ".web42")
+    mkdirSync(web42Dir, { recursive: true })
+
+    const marketplacePath = join(web42Dir, "marketplace.json")
+    if (!existsSync(marketplacePath)) {
+      writeMarketplace(cwd, { ...DEFAULT_MARKETPLACE })
+      console.log(
+        chalk.green(`  Created ${chalk.bold(".web42/marketplace.json")}`)
+      )
+    } else {
+      console.log(
+        chalk.dim("  Skipped .web42/marketplace.json (already exists)")
+      )
+    }
+
+    const resourcesJsonPath = join(web42Dir, "resources.json")
+    if (!existsSync(resourcesJsonPath)) {
+      writeResourcesMeta(cwd, [])
+      console.log(
+        chalk.green(`  Created ${chalk.bold(".web42/resources.json")}`)
+      )
+    } else {
+      console.log(
+        chalk.dim("  Skipped .web42/resources.json (already exists)")
+      )
+    }
+
+    mkdirSync(join(web42Dir, "resources"), { recursive: true })
+
     // Offer bundled starter skills
     const bundled = listBundledSkills()
     if (bundled.length > 0) {
@@ -254,6 +287,11 @@ export const initCommand = new Command("init")
     }
 
     console.log()
+    console.log(
+      chalk.dim(
+        "Edit .web42/marketplace.json to set price, tags, license, and visibility."
+      )
+    )
     console.log(
       chalk.dim(
         "Run `web42 pack` to bundle your agent, or `web42 push` to pack and publish."

@@ -1,10 +1,10 @@
 {
   "name": "web42-publish-prep",
   "tagline": "Prepare your agent for the Web42 marketplace",
-  "description": "Guides agents through the full publish lifecycle: init, manifest enrichment, README writing, file auditing, and validation before pushing to the Web42 marketplace.",
+  "description": "Guides agents through the full publish lifecycle: init, manifest enrichment, marketplace configuration (pricing, license, tags), visual assets (avatar, screenshots, demo media), README writing, file auditing, and two-way sync with the Web42 marketplace.",
   "category": "development",
-  "tags": ["web42", "marketplace", "publishing", "cli", "agent-packaging"],
-  "version": "1.0.0",
+  "tags": ["web42", "marketplace", "publishing", "cli", "agent-packaging", "sync"],
+  "version": "2.0.0",
   "license": "MIT",
   "pricing": "free",
   "support_url": "https://github.com/web42-ai/web42-marketplace/issues",

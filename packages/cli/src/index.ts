@@ -10,6 +10,7 @@ import { pushCommand } from "./commands/push.js"
 import { pullCommand } from "./commands/pull.js"
 import { remixCommand } from "./commands/remix.js"
 import { searchCommand } from "./commands/search.js"
+import { syncCommand } from "./commands/sync.js"
 import { getAllPlatformCommands } from "./platforms/registry.js"
 import { setApiUrl } from "./utils/config.js"
 import { CLI_VERSION } from "./version.js"
@@ -38,6 +39,7 @@ program.addCommand(pushCommand)
 program.addCommand(pullCommand)
 program.addCommand(remixCommand)
 program.addCommand(searchCommand)
+program.addCommand(syncCommand)
 
 for (const platformCmd of getAllPlatformCommands()) {
   program.addCommand(platformCmd)
