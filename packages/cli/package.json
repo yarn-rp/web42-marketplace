@@ -1,14 +1,15 @@
 {
   "name": "@web42/cli",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "CLI for the Web42 Agent Marketplace - push, install, and remix OpenClaw agent packages",
   "type": "module",
   "bin": {
     "web42": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "build:binary": "bash scripts/sync-version.sh && bash scripts/build-binaries.sh",
+    "embed-skills": "npx tsx scripts/embed-skills.ts",
+    "build": "npm run embed-skills && tsc",
+    "build:binary": "bash scripts/sync-version.sh && npm run embed-skills && bash scripts/build-binaries.sh",
     "dev": "tsc --watch",
     "start": "node dist/index.js"
   },

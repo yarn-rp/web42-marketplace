@@ -1,56 +1,38 @@
-import { existsSync, readdirSync, readFileSync, mkdirSync, cpSync } from "fs"
+import { writeFileSync, mkdirSync } from "fs"
 import { join, dirname } from "path"
-import { fileURLToPath } from "url"
 
 import { parseSkillMd } from "./skill.js"
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const BUNDLED_SKILLS_DIR = join(__dirname, "..", "..", "skills")
+import { EMBEDDED_SKILLS } from "../generated/embedded-skills.js"
 
 export interface BundledSkill {
   name: string
   description: string
-  sourcePath: string
 }
 
 export function listBundledSkills(): BundledSkill[] {
-  if (!existsSync(BUNDLED_SKILLS_DIR)) return []
-
   const skills: BundledSkill[] = []
-  try {
-    const entries = readdirSync(BUNDLED_SKILLS_DIR, { withFileTypes: true })
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      const skillMdPath = join(BUNDLED_SKILLS_DIR, entry.name, "SKILL.md")
-      if (!existsSync(skillMdPath)) continue
+  for (const skill of EMBEDDED_SKILLS) {
+    const skillMdFile = skill.files.find((f) => f.path === "SKILL.md")
+    if (!skillMdFile) continue
 
-      const content = readFileSync(skillMdPath, "utf-8")
-      const parsed = parseSkillMd(content, entry.name)
-      skills.push({
-        name: parsed.name,
-        description: parsed.description,
-        sourcePath: join(BUNDLED_SKILLS_DIR, entry.name),
-      })
-    }
-  } catch {
-    // Bundled skills directory missing or unreadable
+    const parsed = parseSkillMd(skillMdFile.content, skill.name)
+    skills.push({ name: parsed.name, description: parsed.description })
   }
   return skills.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export function copySkillToWorkspace(skillName: string, cwd: string): boolean {
-  const sourcePath = join(BUNDLED_SKILLS_DIR, skillName)
-  if (!existsSync(sourcePath)) return false
+  const skill = EMBEDDED_SKILLS.find((s) => s.name === skillName)
+  if (!skill) return false
 
-  const targetPath = join(cwd, "skills", skillName)
-  mkdirSync(targetPath, { recursive: true })
+  const targetDir = join(cwd, "skills", skillName)
 
-  cpSync(sourcePath, targetPath, {
-    recursive: true,
-    filter: (src) => !src.endsWith("_meta.json"),
-  })
+  for (const file of skill.files) {
+    if (file.path === "_meta.json") continue
+    const filePath = join(targetDir, file.path)
+    mkdirSync(dirname(filePath), { recursive: true })
+    writeFileSync(filePath, file.content, "utf-8")
+  }
 
   return true
 }
