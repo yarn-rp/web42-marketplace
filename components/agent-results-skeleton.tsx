@@ -7,7 +7,7 @@ function AgentCardSkeleton() {
       <Skeleton className="aspect-[16/9] w-full rounded-none" />
       <CardHeader className="p-4 pb-2">
         <div className="flex items-center gap-2">
-          <Skeleton className="size-7 rounded-md" />
+          <Skeleton className="size-9 rounded-md" />
           <div className="flex-1 space-y-1">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-16" />

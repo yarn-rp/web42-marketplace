@@ -78,10 +78,10 @@ export function AgentCard({
                   <img
                     src={agent.profile_image_url}
                     alt={agent.name}
-                    className="size-12 rounded-lg object-cover opacity-60"
+                    className="size-16 rounded-xl object-cover opacity-60"
                   />
                 ) : (
-                  <Bot className="size-10 text-muted-foreground/40" />
+                  <Bot className="size-14 text-muted-foreground/40" />
                 )}
               </div>
             )}
@@ -111,12 +111,12 @@ export function AgentCard({
                 <img
                   src={agent.profile_image_url}
                   alt={agent.name}
-                  className="size-7 shrink-0 rounded-md object-cover"
+                    className="size-9 shrink-0 rounded-md object-cover"
                 />
               ) : (
-                <Avatar className="size-7">
+                <Avatar className="size-9">
                   <AvatarImage src={owner?.avatar_url ?? undefined} />
-                  <AvatarFallback className="text-[10px]">
+                  <AvatarFallback className="text-xs">
                     {username[0]?.toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

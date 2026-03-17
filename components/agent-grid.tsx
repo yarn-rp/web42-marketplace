@@ -51,7 +51,7 @@ function AgentMasonryGrid({ agents }: { agents: Agent[] }) {
   return (
     <div className="flex justify-center w-full">
       <div className="gap-4 w-full">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 w-full">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 w-full">
           {agents.map((agent, index) => (
             <div key={`${index}-${agent.id}`}>
               <AgentCard agent={agent} order={index} />
@@ -66,7 +66,7 @@ function AgentMasonryGrid({ agents }: { agents: Agent[] }) {
 export function FeaturedAgentGrid({ agents }: { agents: Agent[] }) {
   return (
     <div className="mx-auto w-full max-w-7xl bg-neutral-50/40 dark:bg-neutral-950/40 border border-dashed border-black/10 px-4 py-3 sm:px-6 rounded-2xl">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {agents.map((agent, index) => (
           <AgentCard key={agent.id} agent={agent} order={index} />
         ))}
