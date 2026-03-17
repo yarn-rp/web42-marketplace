@@ -110,27 +110,44 @@ input:-webkit-autofill:active {
   -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, black 40%, transparent 100%);
 }
 
-/* MDXEditor theme overrides */
-.mdxeditor-wrapper .mdxeditor {
-  --accentBase: hsl(var(--primary));
-  --accentBgSubtle: hsl(var(--accent));
+/* MDXEditor theme overrides
+   Targets both the inline editor (.mdxeditor-wrapper .mdxeditor)
+   and the portalled popup container (.mdxeditor-popup-container)
+   which MDXEditor appends to document.body for dropdowns/dialogs. */
+.mdxeditor-wrapper .mdxeditor,
+.mdxeditor-popup-container {
+  --accentBase: hsl(var(--secondary));
+  --accentBgSubtle: hsl(var(--secondary));
+  --accentBg: hsl(var(--accent));
+  --accentBgHover: hsl(var(--accent));
+  --accentBgActive: hsl(var(--muted));
+  --accentLine: hsl(var(--border));
   --accentBorder: hsl(var(--border));
+  --accentBorderHover: hsl(var(--ring));
   --accentSolid: hsl(var(--primary));
+  --accentSolidHover: hsl(var(--primary));
   --accentText: hsl(var(--primary));
+  --accentTextContrast: hsl(var(--primary));
+
   --basePageBg: hsl(var(--card));
   --baseBase: hsl(var(--background));
   --baseBgSubtle: hsl(var(--muted));
   --baseBg: hsl(var(--accent));
   --baseBgHover: hsl(var(--accent));
-  --baseBgActive: hsl(var(--accent));
+  --baseBgActive: hsl(var(--muted));
+  --baseLine: hsl(var(--border));
   --baseBorder: hsl(var(--border));
-  --baseBorderHover: hsl(var(--border));
+  --baseBorderHover: hsl(var(--ring));
   --baseSolid: hsl(var(--muted-foreground));
-  --baseSolidHover: hsl(var(--muted-foreground));
+  --baseSolidHover: hsl(var(--foreground));
   --baseText: hsl(var(--foreground));
   --baseTextContrast: hsl(var(--foreground));
+
   font-family: inherit;
   color: hsl(var(--foreground));
+}
+
+.mdxeditor-wrapper .mdxeditor {
   background: hsl(var(--card));
   border-radius: 0;
 }
@@ -139,16 +156,6 @@ input:-webkit-autofill:active {
   background: hsl(var(--muted)) !important;
   border-color: hsl(var(--border)) !important;
   border-radius: 0 !important;
-}
-
-.mdxeditor-wrapper .mdxeditor-toolbar button,
-.mdxeditor-wrapper .mdxeditor-toolbar select {
-  color: hsl(var(--foreground));
-}
-
-.mdxeditor-wrapper .mdxeditor-toolbar button[data-state="on"],
-.mdxeditor-wrapper .mdxeditor-toolbar button:hover {
-  background: hsl(var(--accent));
 }
 
 .mdxeditor-wrapper .mdxeditor-diff-source-wrapper {
