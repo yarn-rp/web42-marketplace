@@ -1,16 +1,44 @@
+export interface ParsedSkill {
+  name: string
+  description: string
+  internal: boolean
+}
+
+function parseFrontmatter(lines: string[]): {
+  frontmatter: Record<string, string>
+  bodyStartIndex: number
+} {
+  const frontmatter: Record<string, string> = {}
+  if (lines[0]?.trim() !== "---") return { frontmatter, bodyStartIndex: 0 }
+
+  let i = 1
+  for (; i < lines.length; i++) {
+    if (lines[i].trim() === "---") return { frontmatter, bodyStartIndex: i + 1 }
+    const match = lines[i].match(/^(\w+)\s*:\s*(.*)$/)
+    if (match) {
+      const val = match[2].trim().replace(/^["']|["']$/g, "")
+      frontmatter[match[1]] = val
+    }
+  }
+  return { frontmatter, bodyStartIndex: 0 }
+}
+
 export function parseSkillMd(
   content: string,
   fallbackName: string
-): { name: string; description: string } {
+): ParsedSkill {
   const lines = content.split("\n")
-  let name = fallbackName
+  const { frontmatter, bodyStartIndex } = parseFrontmatter(lines)
+
+  let name = frontmatter.name || fallbackName
+  const internal = frontmatter.internal === "true"
   const descriptionLines: string[] = []
 
-  let i = 0
+  let i = bodyStartIndex
   for (; i < lines.length; i++) {
     const headingMatch = lines[i].match(/^#\s+(.+)/)
     if (headingMatch) {
-      name = headingMatch[1].trim()
+      if (!frontmatter.name) name = headingMatch[1].trim()
       i++
       break
     }
@@ -19,6 +47,11 @@ export function parseSkillMd(
     if (lines[i].match(/^#/)) break
     descriptionLines.push(lines[i])
   }
-  const description = descriptionLines.join("\n").trim()
-  return { name, description: description || `Skill: ${fallbackName}` }
+
+  const description =
+    frontmatter.description ||
+    descriptionLines.join("\n").trim() ||
+    `Skill: ${fallbackName}`
+
+  return { name, description, internal }
 }

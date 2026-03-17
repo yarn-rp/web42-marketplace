@@ -15,6 +15,7 @@ import ora from "ora"
 import { apiPost } from "../utils/api.js"
 import { requireAuth } from "../utils/config.js"
 import { openclawAdapter } from "../platforms/openclaw/adapter.js"
+import { parseSkillMd } from "../utils/skill.js"
 
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex")
@@ -91,6 +92,21 @@ export const pushCommand = new Command("push")
     } else {
       spinner.text = "No .web42/ found, packing automatically..."
       const result = await openclawAdapter.pack({ cwd, outputDir: ".web42" })
+
+      const internalPrefixes: string[] = []
+      for (const f of result.files) {
+        const skillMatch = f.path.match(/^skills\/([^/]+)\/SKILL\.md$/)
+        if (skillMatch) {
+          const parsed = parseSkillMd(f.content, skillMatch[1])
+          if (parsed.internal) internalPrefixes.push(`skills/${skillMatch[1]}/`)
+        }
+      }
+      if (internalPrefixes.length > 0) {
+        result.files = result.files.filter(
+          (f) => !internalPrefixes.some((p) => f.path.startsWith(p))
+        )
+      }
+
       processedFiles = result.files
 
       const existingKeys = new Set(
@@ -104,7 +120,6 @@ export const pushCommand = new Command("push")
         }
       }
 
-      // Write the packed artifact so it can be inspected later
       mkdirSync(web42Dir, { recursive: true })
       for (const file of result.files) {
         const filePath = join(web42Dir, file.path)

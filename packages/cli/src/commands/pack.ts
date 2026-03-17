@@ -38,14 +38,24 @@ export const packCommand = new Command("pack")
     try {
       const result = await openclawAdapter.pack({ cwd, outputDir: opts.output })
 
-      // Detect skills from packed files (skills/*/SKILL.md pattern)
+      // Detect skills from packed files and strip internal ones
+      const internalSkillPrefixes: string[] = []
       const detectedSkills: Array<{ name: string; description: string }> = []
       for (const f of result.files) {
         const match = f.path.match(/^skills\/([^/]+)\/SKILL\.md$/)
         if (match) {
           const parsed = parseSkillMd(f.content, match[1])
-          detectedSkills.push(parsed)
+          if (parsed.internal) {
+            internalSkillPrefixes.push(`skills/${match[1]}/`)
+          } else {
+            detectedSkills.push({ name: parsed.name, description: parsed.description })
+          }
         }
+      }
+      if (internalSkillPrefixes.length > 0) {
+        result.files = result.files.filter(
+          (f) => !internalSkillPrefixes.some((prefix) => f.path.startsWith(prefix))
+        )
       }
       if (detectedSkills.length > 0) {
         manifest.skills = detectedSkills.sort((a, b) =>

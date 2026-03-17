@@ -11,6 +11,7 @@ import inquirer from "inquirer"
 
 import { requireAuth } from "../utils/config.js"
 import { parseSkillMd } from "../utils/skill.js"
+import { listBundledSkills, copySkillToWorkspace } from "../utils/bundled-skills.js"
 import { resolvePlatform, listPlatforms } from "../platforms/registry.js"
 import {
   AGENTS_MD,
@@ -37,7 +38,9 @@ function detectWorkspaceSkills(
         if (existsSync(skillMd)) {
           const content = readFileSync(skillMd, "utf-8")
           const parsed = parseSkillMd(content, entry.name)
-          skills.push(parsed)
+          if (!parsed.internal) {
+            skills.push({ name: parsed.name, description: parsed.description })
+          }
         }
       }
     }
@@ -49,7 +52,11 @@ function detectWorkspaceSkills(
 
 export const initCommand = new Command("init")
   .description("Create a manifest.json for your agent package")
-  .action(async () => {
+  .option(
+    "--with-skills [names...]",
+    "Add bundled starter skills (omit names to install all)"
+  )
+  .action(async (opts: { withSkills?: boolean | string[] }) => {
     const config = requireAuth()
     const cwd = process.cwd()
     const manifestPath = join(cwd, "manifest.json")
@@ -193,6 +200,57 @@ export const initCommand = new Command("init")
       console.log(
         chalk.dim(`  Skipped (already exist): ${skipped.join(", ")}`)
       )
+    }
+
+    // Offer bundled starter skills
+    const bundled = listBundledSkills()
+    if (bundled.length > 0) {
+      let skillsToInstall: string[] = []
+
+      if (opts.withSkills === true) {
+        skillsToInstall = bundled.map((s) => s.name)
+      } else if (Array.isArray(opts.withSkills) && opts.withSkills.length > 0) {
+        skillsToInstall = opts.withSkills.filter((name) =>
+          bundled.some((s) => s.name === name)
+        )
+        const unknown = opts.withSkills.filter(
+          (name) => !bundled.some((s) => s.name === name)
+        )
+        if (unknown.length > 0) {
+          console.log(
+            chalk.yellow(`  Unknown skill(s): ${unknown.join(", ")}`)
+          )
+        }
+      } else if (!opts.withSkills) {
+        console.log()
+        const { selectedSkills } = await inquirer.prompt([
+          {
+            type: "checkbox",
+            name: "selectedSkills",
+            message: "Add starter skills to your workspace?",
+            choices: bundled.map((s) => ({
+              name: `${s.name} — ${s.description}`,
+              value: s.name,
+              checked: false,
+            })),
+          },
+        ])
+        skillsToInstall = selectedSkills
+      }
+
+      if (skillsToInstall.length > 0) {
+        const installed: string[] = []
+        for (const name of skillsToInstall) {
+          if (copySkillToWorkspace(name, cwd)) {
+            installed.push(name)
+          }
+        }
+        if (installed.length > 0) {
+          console.log(
+            chalk.green(`  Added starter skill(s): ${installed.join(", ")}`)
+          )
+        }
+      }
     }
 
     console.log()
