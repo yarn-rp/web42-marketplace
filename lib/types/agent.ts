@@ -169,3 +169,42 @@ export interface Refund {
   created_at: string
   order?: Order
 }
+
+export interface AgentSnapshot {
+  identity: { name: string; slug: string; description: string }
+  readme: string
+  manifest: Record<string, unknown>
+  marketplace: {
+    price_cents: number
+    currency: string
+    license: string | null
+    visibility: string
+    tags: string[]
+  }
+  avatar_url: string | null
+  resources: Array<{
+    title: string
+    description: string | null
+    type: string
+    url: string
+    thumbnail_url: string | null
+    sort_order: number
+  }>
+  files: Array<{ path: string; content: string | null; content_hash: string }>
+}
+
+export interface SyncStatusResponse {
+  hash: string
+  updated_at: string
+}
+
+export interface SyncPushResponse {
+  hash: string
+  updated_at: string
+}
+
+export interface SyncPullResponse {
+  hash: string
+  updated_at: string
+  snapshot: AgentSnapshot
+}

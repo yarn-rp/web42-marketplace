@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/db/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { authenticateRequest } from "@/lib/auth/cli-auth"
+import { computeAgentHash } from "@/lib/sync/agent-sync"
 
 // GET /api/agents - list agents
 export async function GET(request: Request) {
@@ -59,8 +60,20 @@ export async function POST(request: Request) {
   )
 
   const body = await request.json()
-  const { slug, name, description, readme, manifest, cover_image_url, demo_video_url } =
-    body
+  const {
+    slug,
+    name,
+    description,
+    readme,
+    manifest,
+    cover_image_url,
+    demo_video_url,
+    price_cents,
+    currency,
+    license,
+    visibility,
+    tags,
+  } = body
 
   if (!slug || !name) {
     return NextResponse.json(
@@ -73,6 +86,20 @@ export async function POST(request: Request) {
     manifest.platform = "openclaw"
   }
 
+  const agentFields: Record<string, unknown> = {
+    name,
+    description: description ?? "",
+    readme: readme ?? "",
+    manifest: manifest ?? {},
+    cover_image_url,
+    demo_video_url,
+  }
+
+  if (price_cents !== undefined) agentFields.price_cents = price_cents
+  if (currency !== undefined) agentFields.currency = currency
+  if (license !== undefined) agentFields.license = license
+  if (visibility !== undefined) agentFields.visibility = visibility
+
   const { data: existing } = await adminDb
     .from("agents")
     .select("id")
@@ -80,17 +107,13 @@ export async function POST(request: Request) {
     .eq("slug", slug)
     .maybeSingle()
 
+  let agentId: string
+  let isCreated = false
+
   if (existing) {
     const { data, error } = await adminDb
       .from("agents")
-      .update({
-        name,
-        description: description ?? "",
-        readme: readme ?? "",
-        manifest: manifest ?? {},
-        cover_image_url,
-        demo_video_url,
-      })
+      .update(agentFields)
       .eq("id", existing.id)
       .select()
       .single()
@@ -99,20 +122,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ agent: data, updated: true })
+    agentId = data.id
   } else {
     const { data, error } = await adminDb
       .from("agents")
       .insert({
         slug,
-        name,
-        description: description ?? "",
-        readme: readme ?? "",
-        manifest: manifest ?? {},
         owner_id: userId,
-        cover_image_url,
-        demo_video_url,
         visibility: "private",
+        ...agentFields,
       })
       .select()
       .single()
@@ -121,6 +139,57 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ agent: data, created: true }, { status: 201 })
+    agentId = data.id
+    isCreated = true
   }
+
+  if (Array.isArray(tags)) {
+    await adminDb.from("agent_tags").delete().eq("agent_id", agentId)
+
+    const tagIds: string[] = []
+    for (const tagName of tags) {
+      const trimmed = (tagName as string).trim().toLowerCase()
+      if (!trimmed) continue
+
+      const { data: existingTag } = await adminDb
+        .from("tags")
+        .select("id")
+        .ilike("name", trimmed)
+        .maybeSingle()
+
+      if (existingTag) {
+        tagIds.push(existingTag.id)
+      } else {
+        const { data: created } = await adminDb
+          .from("tags")
+          .insert({ name: trimmed })
+          .select("id")
+          .single()
+        if (created) tagIds.push(created.id)
+      }
+    }
+
+    if (tagIds.length > 0) {
+      await adminDb
+        .from("agent_tags")
+        .insert(tagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })))
+    }
+  }
+
+  const syncResult = await computeAgentHash(agentId)
+
+  const { data: agentData } = await adminDb
+    .from("agents")
+    .select("*")
+    .eq("id", agentId)
+    .single()
+
+  return NextResponse.json(
+    {
+      agent: agentData,
+      ...(isCreated ? { created: true } : { updated: true }),
+      hash: syncResult?.hash ?? null,
+    },
+    { status: isCreated ? 201 : 200 }
+  )
 }

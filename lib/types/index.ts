@@ -6,6 +6,7 @@ export type {
   AgentVisibility,
   AgentVersion,
   AgentFile,
+  AgentSnapshot,
   Category,
   Tag,
   AgentManifest,
@@ -16,6 +17,9 @@ export type {
   PaymentMethod,
   Refund,
   RefundStatus,
+  SyncStatusResponse,
+  SyncPushResponse,
+  SyncPullResponse,
 } from "./agent"
 export type { Profile } from "./profile"
 export { manifestSchema } from "./manifest"
