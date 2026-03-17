@@ -125,6 +125,34 @@ export const pushCommand = new Command("push")
       readme = readFileSync(readmePath, "utf-8")
     }
 
+    let profile_image_data: string | undefined = undefined
+
+    // Agent profile avatar (binary) is handled explicitly, since the packed-files
+    // flow skips binaries.
+    const avatarCandidates = [
+      join(cwd, "avatar/avatar.png"),
+      join(cwd, "avatars/avatar.png"),
+      join(cwd, "avatar.png"),
+    ]
+
+    let avatarPath: string | undefined
+    for (const candidate of avatarCandidates) {
+      if (existsSync(candidate)) {
+        avatarPath = candidate
+        break
+      }
+    }
+
+    if (avatarPath) {
+      const stat = statSync(avatarPath)
+      if (stat.size > 2 * 1024 * 1024) {
+        throw new Error(
+          `Avatar too large (max 2MB): ${relative(cwd, avatarPath)}`
+        )
+      }
+      profile_image_data = readFileSync(avatarPath).toString("base64")
+    }
+
     try {
       const agentResult = await apiPost<{
         agent: { id: string }
@@ -137,6 +165,7 @@ export const pushCommand = new Command("push")
         readme,
         manifest,
         demo_video_url: manifest.demoVideoUrl,
+        profile_image_data,
       })
 
       const agentId = agentResult.agent.id
