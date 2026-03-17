@@ -7,7 +7,7 @@
     "web42": "./dist/index.js"
   },
   "scripts": {
-    "embed-skills": "npx tsx scripts/embed-skills.ts",
+    "embed-skills": "bun scripts/embed-skills.ts",
     "build": "npm run embed-skills && tsc",
     "build:binary": "bash scripts/sync-version.sh && npm run embed-skills && bash scripts/build-binaries.sh",
     "dev": "tsc --watch",

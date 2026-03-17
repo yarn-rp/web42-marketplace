@@ -53,9 +53,7 @@ jobs:
 
       - name: Sync version and build binaries
         working-directory: ${{ env.CLI_DIR }}
-        run: |
-          bash scripts/sync-version.sh
-          bash scripts/build-binaries.sh
+        run: npm run build:binary
 
       - name: Generate checksums
         working-directory: ${{ env.CLI_DIR }}/dist
