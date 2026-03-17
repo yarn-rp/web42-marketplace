@@ -72,7 +72,7 @@ These are NOT auto-excluded but often contain content that should not ship:
 
 ## Using `.web42ignore`
 
-Create a `.web42ignore` file in the workspace root to exclude additional patterns. Syntax follows `.gitignore`:
+`web42 init` scaffolds a default `.web42ignore` with sensible patterns (IDE folders, env files, test dirs, drafts). Edit it to match your workspace. Syntax: glob patterns, one per line — lines starting with `#` are comments.
 
 ```
 # Exclude test fixtures
@@ -86,7 +86,7 @@ drafts/**
 scripts/local-*.sh
 ```
 
-The `.web42ignore` file itself is automatically excluded from the artifact.
+The `.web42ignore` file itself is automatically excluded from the packed artifact.
 
 ## Verification
 
@@ -96,8 +96,14 @@ After auditing, always run:
 web42 pack --dry-run
 ```
 
-This prints every file that would be included. Review the list for:
+This prints:
 
-1. **Unexpected files** — anything you don't recognize or didn't intend to ship
-2. **File count** — a typical agent has 5–30 files. Hundreds of files suggests something is wrong.
-3. **Sensitive content** — spot-check a few files for leaked secrets or personal data
+1. **User ignore patterns** loaded from `.web42ignore` (shown with ✕ prefix)
+2. **Every file** that would be included, with sizes
+3. **File and config variable counts**
+
+Review the output for:
+
+- **Unexpected files** — anything you don't recognize or didn't intend to ship
+- **File count** — a typical agent has 5–30 files. Hundreds of files suggests missing ignore patterns.
+- **Sensitive content** — spot-check a few files for leaked secrets or personal data

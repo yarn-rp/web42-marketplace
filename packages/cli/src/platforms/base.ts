@@ -22,6 +22,7 @@ export interface PackResult {
   files: PackedFile[]
   configTemplate: Record<string, unknown> | null
   configVariables: ConfigVariable[]
+  ignorePatterns?: string[]
 }
 
 export interface InstallOptions {

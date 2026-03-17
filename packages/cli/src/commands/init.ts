@@ -235,6 +235,51 @@ export const initCommand = new Command("init")
 
     mkdirSync(join(web42Dir, "resources"), { recursive: true })
 
+    const ignorePath = join(cwd, ".web42ignore")
+    if (!existsSync(ignorePath)) {
+      writeFileSync(
+        ignorePath,
+        [
+          "# .web42ignore — files excluded from web42 pack / push",
+          "# Syntax: glob patterns, one per line. Lines starting with # are comments.",
+          "# NOTE: .git, node_modules, .web42/, manifest.json, and other internals",
+          "#       are always excluded automatically.",
+          "",
+          "# Working notes & drafts",
+          "TODO.md",
+          "NOTES.md",
+          "drafts/**",
+          "",
+          "# Environment & secrets",
+          ".env",
+          ".env.*",
+          "",
+          "# IDE / editor",
+          ".vscode/**",
+          ".idea/**",
+          ".cursor/**",
+          "",
+          "# Test & CI",
+          "tests/**",
+          "__tests__/**",
+          ".github/**",
+          "",
+          "# Build artifacts",
+          "dist/**",
+          "build/**",
+          "",
+          "# Large media not needed at runtime",
+          "# *.mp4",
+          "# *.mov",
+          "",
+        ].join("\n"),
+        "utf-8"
+      )
+      console.log(chalk.green(`  Created ${chalk.bold(".web42ignore")}`))
+    } else {
+      console.log(chalk.dim("  Skipped .web42ignore (already exists)"))
+    }
+
     // Offer bundled starter skills
     const bundled = listBundledSkills()
     if (bundled.length > 0) {

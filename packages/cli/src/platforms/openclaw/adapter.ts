@@ -31,7 +31,7 @@ import { USER_MD } from "./templates.js"
 const OPENCLAW_HOME = join(homedir(), ".openclaw")
 const OPENCLAW_CONFIG_PATH = join(OPENCLAW_HOME, "openclaw.json")
 
-const HARDCODED_EXCLUDES = [
+export const HARDCODED_EXCLUDES = [
   "auth-profiles.json",
   "MEMORY.md",
   "memory/**",
@@ -546,7 +546,7 @@ export class OpenClawAdapter implements PlatformAdapter {
       configVariables = extraction.configVariables
     }
 
-    return { files, configTemplate, configVariables }
+    return { files, configTemplate, configVariables, ignorePatterns }
   }
 
   async install(options: InstallOptions): Promise<InstallResult> {

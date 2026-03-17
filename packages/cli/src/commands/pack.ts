@@ -4,8 +4,10 @@ import { Command } from "commander"
 import chalk from "chalk"
 import ora from "ora"
 
-import { openclawAdapter } from "../platforms/openclaw/adapter.js"
+import { openclawAdapter, HARDCODED_EXCLUDES } from "../platforms/openclaw/adapter.js"
 import { parseSkillMd } from "../utils/skill.js"
+
+const HARDCODED_EXCLUDES_SET = new Set(HARDCODED_EXCLUDES)
 
 export const packCommand = new Command("pack")
   .description("Pack your agent workspace into a distributable artifact")
@@ -77,6 +79,18 @@ export const packCommand = new Command("pack")
 
       if (opts.dryRun) {
         spinner.stop()
+
+        const userPatterns = (result.ignorePatterns ?? []).filter(
+          (p) => !HARDCODED_EXCLUDES_SET.has(p)
+        )
+        if (userPatterns.length > 0) {
+          console.log(chalk.bold("Ignore patterns from .web42ignore:"))
+          for (const p of userPatterns) {
+            console.log(chalk.yellow(`  ✕ ${p}`))
+          }
+          console.log()
+        }
+
         console.log(chalk.bold("Dry run — would pack:"))
         console.log()
         for (const f of result.files) {

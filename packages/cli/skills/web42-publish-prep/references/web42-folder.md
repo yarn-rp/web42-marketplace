@@ -97,11 +97,23 @@ Keep these in version control:
 - `.web42/avatar.*`
 - `.web42/resources/`
 
+## `.web42ignore` (Workspace Root)
+
+Not inside `.web42/` — lives at the workspace root alongside `manifest.json`.
+
+- Created by `web42 init` with sensible defaults (IDE dirs, env files, test folders, drafts).
+- Glob patterns, one per line. Lines starting with `#` are comments.
+- Controls which files are excluded when running `web42 pack` or `web42 push`.
+- Use `web42 pack --dry-run` to verify what gets included/excluded.
+- See `references/file-hygiene.md` for full details.
+
+Keep `.web42ignore` in version control so the ignore rules travel with the project.
+
 ## Sync Lifecycle
 
 ```
-web42 init     → Creates .web42/ with marketplace.json, resources.json
-web42 pack     → Generates .web42/dist/ from workspace files
+web42 init     → Creates .web42/, marketplace.json, resources.json, .web42ignore
+web42 pack     → Generates .web42/dist/ from workspace files (respects .web42ignore)
 web42 push     → Sends snapshot (manifest + README + marketplace + files + avatar + resources) to remote
 web42 pull     → Fetches remote snapshot, writes to local files
 web42 sync     → Shows local vs remote hash comparison without changing anything
