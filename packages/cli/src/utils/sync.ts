@@ -143,6 +143,18 @@ export function findLocalAvatar(cwd: string): string | null {
   return null
 }
 
+export function findAgentAvatar(cwd: string): string | null {
+  const avatarSearchPaths = [
+    join(cwd, "avatar/avatar.png"),
+    join(cwd, "avatars/avatar.png"),
+    join(cwd, "avatar.png"),
+  ]
+  for (const ap of avatarSearchPaths) {
+    if (existsSync(ap)) return ap
+  }
+  return null
+}
+
 // ---------------------------------------------------------------------------
 // .web42/resources.json + .web42/resources/
 // ---------------------------------------------------------------------------

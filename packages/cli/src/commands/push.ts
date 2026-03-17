@@ -12,6 +12,7 @@ import {
   buildLocalSnapshot,
   computeHashFromSnapshot,
   findLocalAvatar,
+  findAgentAvatar,
   readResourcesMeta,
   readSyncState,
   writeSyncState,
@@ -214,7 +215,7 @@ export const pushCommand = new Command("push")
       // -------------------------------------------------------------------
       // Step 6: Upload avatar if present
       // -------------------------------------------------------------------
-      const avatarPath = findLocalAvatar(cwd)
+      const avatarPath = findLocalAvatar(cwd) || findAgentAvatar(cwd)
       if (avatarPath) {
         spinner.text = "Uploading avatar..."
         const ext = avatarPath.split(".").pop() ?? "png"
