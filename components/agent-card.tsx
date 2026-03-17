@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Download, GitFork, Star } from "lucide-react"
+import { Bot, Download, GitFork, Star } from "lucide-react"
 
 import type { Agent } from "@/lib/types"
 import { getPlatform } from "@/lib/platforms"
@@ -14,21 +14,20 @@ import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 
+const MAX_VISIBLE_TAGS = 3
+
 export function AgentCard({
   agent,
   order,
-  trim,
   showPrice,
 }: {
   agent: Agent
   order: number
-  trim?: boolean
   showPrice?: boolean
 }) {
   const owner = agent.owner
@@ -40,6 +39,9 @@ export function AgentCard({
     (a, b) => a.sort_order - b.sort_order
   )
   const thumbnail = sortedResources[0]
+  const tags = agent.tags ?? []
+  const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS)
+  const overflowCount = tags.length - MAX_VISIBLE_TAGS
 
   return (
     <motion.div
@@ -49,12 +51,14 @@ export function AgentCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className="h-full"
     >
-      <Link href={href} className="group block">
-        <Card className="overflow-hidden transition-colors hover:bg-accent/50">
-          {thumbnail && (
-            <div className="relative aspect-[16/9] w-full overflow-hidden">
-              {thumbnail.type === "video" ? (
+      <Link href={href} className="group block h-full">
+        <Card className="h-full flex flex-col overflow-hidden transition-colors hover:bg-accent/50">
+          {/* 1. Thumbnail -- always rendered for consistent height */}
+          <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
+            {thumbnail ? (
+              thumbnail.type === "video" ? (
                 <video
                   src={thumbnail.url}
                   muted
@@ -67,53 +71,71 @@ export function AgentCard({
                   alt={agent.name}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
-              )}
-              <div className="absolute right-3 top-3 flex gap-1.5">
-                {showPrice && (
-                  <AgentPriceBadge
-                    priceCents={agent.price_cents ?? 0}
-                    currency={agent.currency}
-                    className="text-xs backdrop-blur-sm"
+              )
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/60">
+                {agent.profile_image_url ? (
+                  <img
+                    src={agent.profile_image_url}
+                    alt={agent.name}
+                    className="size-12 rounded-lg object-cover opacity-60"
                   />
-                )}
-                {primaryCategory && (
-                  <Badge
-                    variant="secondary"
-                    className="text-xs backdrop-blur-sm"
-                  >
-                    {primaryCategory.name}
-                  </Badge>
+                ) : (
+                  <Bot className="size-10 text-muted-foreground/40" />
                 )}
               </div>
+            )}
+            <div className="absolute right-3 top-3 flex gap-1.5">
+              {showPrice && (
+                <AgentPriceBadge
+                  priceCents={agent.price_cents ?? 0}
+                  currency={agent.currency}
+                  className="text-xs backdrop-blur-sm"
+                />
+              )}
+              {primaryCategory && (
+                <Badge
+                  variant="secondary"
+                  className="text-xs backdrop-blur-sm"
+                >
+                  {primaryCategory.name}
+                </Badge>
+              )}
             </div>
-          )}
+          </div>
 
+          {/* 2. Identity -- avatar + name + username */}
           <CardHeader className="p-4 pb-2">
             <div className="flex items-center gap-2">
               {agent.profile_image_url ? (
                 <img
                   src={agent.profile_image_url}
                   alt={agent.name}
-                  className="size-5 shrink-0 rounded object-cover"
+                  className="size-7 shrink-0 rounded-md object-cover"
                 />
               ) : (
-                <Avatar className="size-5">
+                <Avatar className="size-7">
                   <AvatarImage src={owner?.avatar_url ?? undefined} />
-                  <AvatarFallback className="text-[9px]">
+                  <AvatarFallback className="text-[10px]">
                     {username[0]?.toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               )}
-              <span className="font-mono text-xs text-muted-foreground">
-                @{username}
-              </span>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="truncate text-sm font-semibold leading-tight">
+                  {agent.name}
+                </CardTitle>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  @{username}
+                </span>
+              </div>
             </div>
-            <CardTitle className="text-base">{agent.name}</CardTitle>
           </CardHeader>
 
-          <CardContent className="px-4 pb-2">
+          {/* 3. Description + tags -- flex-1 absorbs height variance */}
+          <CardContent className="flex flex-1 flex-col gap-2 px-4 pb-2">
             {agent.remixed_from && (
-              <div className="mb-1.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <GitFork className="size-3" />
                 <span>
                   Remixed from{" "}
@@ -123,14 +145,36 @@ export function AgentCard({
                 </span>
               </div>
             )}
-            <CardDescription className={cn("text-xs leading-relaxed")}>
-              {trim
-                ? `${agent.description.slice(0, 100)}...`
-                : agent.description}
-            </CardDescription>
+            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+              {agent.description}
+            </p>
+
+            {/* 4. Tags */}
+            {visibleTags.length > 0 && (
+              <div className="mt-auto flex flex-wrap gap-1">
+                {visibleTags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="outline"
+                    className="px-1.5 py-0 text-[10px] font-normal"
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+                {overflowCount > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
+                  >
+                    +{overflowCount}
+                  </Badge>
+                )}
+              </div>
+            )}
           </CardContent>
 
-          <CardFooter className="flex items-center gap-3 px-4 pb-4 pt-2 font-mono text-xs text-muted-foreground">
+          {/* 5. Footer -- pinned to bottom */}
+          <CardFooter className="mt-auto flex items-center gap-3 px-4 pb-4 pt-2 font-mono text-xs text-muted-foreground">
             {platformInfo && (
               <span className="flex items-center gap-1" title={platformInfo.name}>
                 <PlatformLogo platform={platformInfo} size={16} className="rounded-sm" />

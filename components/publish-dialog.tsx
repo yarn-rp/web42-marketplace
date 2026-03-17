@@ -98,20 +98,21 @@ export function PublishDialog({
   const [open, setOpen] = useState(false)
 
   const isPublished = agent.visibility === "public"
-  const allPassed =
-    validation.readme &&
-    validation.profileImage &&
-    validation.resources &&
-    validation.license &&
-    validation.tags
+  const isFree = validation.isFree
 
-  const passedCount = [
-    validation.readme,
-    validation.profileImage,
-    validation.resources,
-    validation.license,
-    validation.tags,
-  ].filter(Boolean).length
+  const requiredChecks = isFree
+    ? [validation.readme, validation.license, validation.tags]
+    : [
+        validation.readme,
+        validation.profileImage,
+        validation.resources,
+        validation.license,
+        validation.tags,
+      ]
+
+  const allPassed = requiredChecks.every(Boolean)
+  const passedCount = requiredChecks.filter(Boolean).length
+  const totalCount = requiredChecks.length
 
   const handlePublish = () => {
     setError(null)
@@ -161,7 +162,7 @@ export function PublishDialog({
             Publish
             {!allPassed && (
               <Badge variant="secondary" className="ml-1 text-[10px]">
-                {passedCount}/5
+                {passedCount}/{totalCount}
               </Badge>
             )}
           </Button>
@@ -188,20 +189,24 @@ export function PublishDialog({
             detail={validation.readme ? undefined : "At least 50 characters"}
             hint="Push a README via the CLI"
           />
-          <ChecklistItem
-            icon={ImageIcon}
-            label="Profile image"
-            passed={validation.profileImage}
-            detail={validation.profileImage ? undefined : "1:1 square image"}
-            hint="Upload in the Settings tab"
-          />
-          <ChecklistItem
-            icon={Video}
-            label="Resources"
-            passed={validation.resources}
-            detail={`${validation.resourceCount}/3 minimum`}
-            hint="Upload in the Marketplace tab"
-          />
+          {!isFree && (
+            <ChecklistItem
+              icon={ImageIcon}
+              label="Profile image"
+              passed={validation.profileImage}
+              detail={validation.profileImage ? undefined : "1:1 square image"}
+              hint="Upload in the Settings tab"
+            />
+          )}
+          {!isFree && (
+            <ChecklistItem
+              icon={Video}
+              label="Resources"
+              passed={validation.resources}
+              detail={`${validation.resourceCount}/3 minimum`}
+              hint="Upload in the Marketplace tab"
+            />
+          )}
           <ChecklistItem
             icon={Scale}
             label="License"

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/db/supabase/server"
 
 import type { Agent, AgentLicense, AgentResource, AgentVisibility } from "@/lib/types"
+import { isFreeLicense, isPaidLicense } from "@/lib/license-utils"
 
 export type SortOption = "trending" | "stars" | "installs" | "recent"
 
@@ -89,7 +90,7 @@ export const getAgents = cache(
     let query = db
       .from("agents")
       .select(
-        "*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), resources:agent_resources(id, url, type, sort_order)",
+        "*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)",
         selectOpts
       )
       .eq("visibility", "public")
@@ -217,7 +218,7 @@ export const getFeaturedAgents = cache(async () => {
   const db = await createClient()
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), resources:agent_resources(id, url, type, sort_order)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .eq("featured", true)
     .eq("visibility", "public")
     .order("stars_count", { ascending: false })
@@ -303,7 +304,7 @@ export const getAgentsByUser = cache(async (username: string) => {
 
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .eq("owner_id", owner.id)
     .order("stars_count", { ascending: false })
 
@@ -314,7 +315,7 @@ export const getAgentsByUser = cache(async (username: string) => {
 
   await hydrateRemixSource(db, data ?? [])
 
-  return data as Agent[]
+  return (data ?? []).map(flattenAgentRelations) as Agent[]
 })
 
 export const getMyAgents = cache(async () => {
@@ -327,7 +328,7 @@ export const getMyAgents = cache(async () => {
 
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
 
@@ -338,7 +339,7 @@ export const getMyAgents = cache(async () => {
 
   await hydrateRemixSource(db, data ?? [])
 
-  return data as Agent[]
+  return (data ?? []).map(flattenAgentRelations) as Agent[]
 })
 
 export const getPurchasedAgents = cache(async () => {
@@ -360,7 +361,7 @@ export const getPurchasedAgents = cache(async () => {
 
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .in("id", agentIds)
     .neq("owner_id", user.id)
     .order("created_at", { ascending: false })
@@ -370,7 +371,7 @@ export const getPurchasedAgents = cache(async () => {
     return []
   }
 
-  return data as Agent[]
+  return (data ?? []).map(flattenAgentRelations) as Agent[]
 })
 
 export async function starAgent(agentId: string) {
@@ -668,6 +669,27 @@ export async function updateAgentPrice(
     return { error: "Minimum price is $5.00. Set to $0 for free." }
   }
 
+  const { data: agent } = await db
+    .from("agents")
+    .select("license")
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+    .single()
+
+  if (agent?.license) {
+    const license = agent.license as AgentLicense
+    if (priceCents === 0 && isPaidLicense(license)) {
+      return {
+        error: `Cannot set price to free while using a commercial license (${license}). Change the license first.`,
+      }
+    }
+    if (priceCents > 0 && isFreeLicense(license)) {
+      return {
+        error: `Cannot set a paid price while using an open-source license (${license}). Change the license first.`,
+      }
+    }
+  }
+
   if (priceCents > 0) {
     const { data: profile } = await db
       .from("users")
@@ -709,6 +731,7 @@ export interface PublishValidation {
   license: boolean
   tags: boolean
   resourceCount: number
+  isFree: boolean
 }
 
 export async function getPublishValidation(
@@ -718,7 +741,7 @@ export async function getPublishValidation(
 
   const { data: agent } = await db
     .from("agents")
-    .select("readme, profile_image_url, license")
+    .select("readme, profile_image_url, license, price_cents")
     .eq("id", agentId)
     .single()
 
@@ -733,14 +756,16 @@ export async function getPublishValidation(
     .eq("agent_id", agentId)
 
   const rc = resourceCount ?? 0
+  const isFree = (agent?.price_cents ?? 0) === 0
 
   return {
     readme: !!agent?.readme && agent.readme.trim().length > 50,
-    profileImage: !!agent?.profile_image_url,
-    resources: rc >= 3,
+    profileImage: isFree ? true : !!agent?.profile_image_url,
+    resources: isFree ? true : rc >= 3,
     license: !!agent?.license,
     tags: (tagCount ?? 0) >= 1,
     resourceCount: rc,
+    isFree,
   }
 }
 
@@ -760,6 +785,22 @@ export async function publishAgent(agentId: string, profileUsername: string) {
   if (!validation.resources) errors.push(`At least 3 resources required (${validation.resourceCount}/3)`)
   if (!validation.license) errors.push("License must be selected")
   if (!validation.tags) errors.push("At least 1 tag is required")
+
+  const { data: agentData } = await db
+    .from("agents")
+    .select("price_cents, license")
+    .eq("id", agentId)
+    .single()
+
+  if (agentData?.license) {
+    const isFree = (agentData.price_cents ?? 0) === 0
+    if (isFree && isPaidLicense(agentData.license as AgentLicense)) {
+      errors.push("Free agents cannot use a commercial license (Proprietary/Custom)")
+    }
+    if (!isFree && isFreeLicense(agentData.license as AgentLicense)) {
+      errors.push("Paid agents cannot use an open-source license (MIT, Apache, GPL, BSD)")
+    }
+  }
 
   if (errors.length > 0) {
     return { error: errors.join(". "), validation }
@@ -1045,6 +1086,23 @@ export async function updateAgentLicense(
 
   if (!user) return { error: "Not authenticated" }
 
+  if (license) {
+    const { data: agent } = await db
+      .from("agents")
+      .select("price_cents")
+      .eq("id", agentId)
+      .eq("owner_id", user.id)
+      .single()
+
+    const isFree = (agent?.price_cents ?? 0) === 0
+    if (isFree && isPaidLicense(license)) {
+      return { error: "Free agents must use an open-source license (MIT, Apache, GPL, BSD)." }
+    }
+    if (!isFree && isFreeLicense(license)) {
+      return { error: "Paid agents must use a commercial license (Proprietary or Custom)." }
+    }
+  }
+
   const { error } = await db
     .from("agents")
     .update({ license })
@@ -1096,4 +1154,66 @@ export async function updateAgentTags(
 
   revalidatePath(`/${profileUsername}`)
   return { success: true }
+}
+
+export async function createTagAndAssign(
+  agentId: string,
+  tagName: string,
+  profileUsername: string
+) {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const trimmed = tagName.trim().toLowerCase()
+  if (!trimmed) return { error: "Tag name cannot be empty" }
+
+  const { data: existing } = await db
+    .from("tags")
+    .select("id, name, created_at")
+    .ilike("name", trimmed)
+    .maybeSingle()
+
+  let tagId: string
+
+  if (existing) {
+    tagId = existing.id
+  } else {
+    const { data: created, error: createError } = await db
+      .from("tags")
+      .insert({ name: trimmed })
+      .select("id, name, created_at")
+      .single()
+
+    if (createError || !created) {
+      console.error("Error creating tag:", createError)
+      return { error: createError?.message ?? "Failed to create tag" }
+    }
+    tagId = created.id
+  }
+
+  const { error: linkError } = await db
+    .from("agent_tags")
+    .upsert(
+      { agent_id: agentId, tag_id: tagId },
+      { onConflict: "agent_id,tag_id" }
+    )
+
+  if (linkError) {
+    console.error("Error assigning tag:", linkError)
+    return { error: linkError.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return {
+    success: true,
+    tag: existing ?? {
+      id: tagId,
+      name: trimmed,
+      created_at: new Date().toISOString(),
+    },
+  }
 }

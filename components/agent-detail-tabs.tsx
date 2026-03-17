@@ -12,7 +12,6 @@ import {
   Lock,
   Pencil,
   Sparkles,
-  ShoppingBag,
   Wrench,
   X,
 } from "lucide-react"
@@ -25,15 +24,12 @@ import type {
   SkillEntry,
   Tag,
 } from "@/lib/types"
-import type { PublishValidation } from "@/app/actions/agent"
 import { updateAgentReadme } from "@/app/actions/agent"
 import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -432,11 +428,17 @@ function ContentTab({ files }: { files: AgentFile[] }) {
   )
 }
 
-function SettingsTab({
+function AgentDetailsTab({
   agent,
+  resources,
+  allTags,
+  selectedTagIds,
   profileUsername,
 }: {
   agent: Agent
+  resources: AgentResource[]
+  allTags: Tag[]
+  selectedTagIds: string[]
   profileUsername: string
 }) {
   return (
@@ -456,51 +458,32 @@ function SettingsTab({
         <AgentLicenseSelect
           agentId={agent.id}
           currentLicense={agent.license}
+          priceCents={agent.price_cents ?? 0}
           profileUsername={profileUsername}
         />
         <AgentPriceEditor
           agentId={agent.id}
           currentPriceCents={agent.price_cents ?? 0}
+          currentLicense={agent.license}
           currency={agent.currency ?? "usd"}
           profileUsername={profileUsername}
         />
       </div>
-      <div className="border-t pt-6">
-        <AgentDeleteButton
-          agentId={agent.id}
-          agentName={agent.name}
-          profileUsername={profileUsername}
-        />
-      </div>
-    </div>
-  )
-}
-
-function MarketplaceTab({
-  agent,
-  resources,
-  allTags,
-  selectedTagIds,
-  profileUsername,
-}: {
-  agent: Agent
-  resources: AgentResource[]
-  allTags: Tag[]
-  selectedTagIds: string[]
-  profileUsername: string
-}) {
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
       <AgentTagManager
         agentId={agent.id}
         allTags={allTags}
         selectedTagIds={selectedTagIds}
         profileUsername={profileUsername}
       />
-      <div className="md:col-span-2">
-        <AgentResourceUpload
+      <AgentResourceUpload
+        agentId={agent.id}
+        resources={resources}
+        profileUsername={profileUsername}
+      />
+      <div className="border-t pt-6">
+        <AgentDeleteButton
           agentId={agent.id}
-          resources={resources}
+          agentName={agent.name}
           profileUsername={profileUsername}
         />
       </div>
@@ -539,16 +522,10 @@ export function AgentDetailTabs({
           Content
         </TabsTrigger>
         {isOwner && (
-          <>
-            <TabsTrigger value="settings" className="gap-1.5">
-              <Wrench className="size-3.5" />
-              Settings
-            </TabsTrigger>
-            <TabsTrigger value="marketplace" className="gap-1.5">
-              <ShoppingBag className="size-3.5" />
-              Marketplace
-            </TabsTrigger>
-          </>
+          <TabsTrigger value="agent-details" className="gap-1.5">
+            <Wrench className="size-3.5" />
+            Agent Details
+          </TabsTrigger>
         )}
       </TabsList>
 
@@ -578,21 +555,15 @@ export function AgentDetailTabs({
       </TabsContent>
 
       {isOwner && profileUsername && (
-        <>
-          <TabsContent value="settings">
-            <SettingsTab agent={agent} profileUsername={profileUsername} />
-          </TabsContent>
-
-          <TabsContent value="marketplace">
-            <MarketplaceTab
-              agent={agent}
-              resources={resources}
-              allTags={allTags}
-              selectedTagIds={selectedTagIds}
-              profileUsername={profileUsername}
-            />
-          </TabsContent>
-        </>
+        <TabsContent value="agent-details">
+          <AgentDetailsTab
+            agent={agent}
+            resources={resources}
+            allTags={allTags}
+            selectedTagIds={selectedTagIds}
+            profileUsername={profileUsername}
+          />
+        </TabsContent>
       )}
     </Tabs>
   )

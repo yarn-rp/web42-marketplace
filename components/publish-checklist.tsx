@@ -83,12 +83,19 @@ export function PublishChecklist({
   const [error, setError] = useState<string | null>(null)
 
   const isPublished = agent.visibility === "public"
-  const allPassed =
-    validation.readme &&
-    validation.profileImage &&
-    validation.resources &&
-    validation.license &&
-    validation.tags
+  const isFree = validation.isFree
+
+  const requiredChecks = isFree
+    ? [validation.readme, validation.license, validation.tags]
+    : [
+        validation.readme,
+        validation.profileImage,
+        validation.resources,
+        validation.license,
+        validation.tags,
+      ]
+
+  const allPassed = requiredChecks.every(Boolean)
 
   const handlePublish = () => {
     setError(null)
@@ -147,18 +154,22 @@ export function PublishChecklist({
           passed={validation.readme}
           detail={validation.readme ? undefined : "At least 50 characters"}
         />
-        <ChecklistItem
-          icon={ImageIcon}
-          label="Profile image"
-          passed={validation.profileImage}
-          detail={validation.profileImage ? undefined : "1:1 square image"}
-        />
-        <ChecklistItem
-          icon={Video}
-          label="Resources"
-          passed={validation.resources}
-          detail={`${validation.resourceCount}/3 minimum`}
-        />
+        {!isFree && (
+          <ChecklistItem
+            icon={ImageIcon}
+            label="Profile image"
+            passed={validation.profileImage}
+            detail={validation.profileImage ? undefined : "1:1 square image"}
+          />
+        )}
+        {!isFree && (
+          <ChecklistItem
+            icon={Video}
+            label="Resources"
+            passed={validation.resources}
+            detail={`${validation.resourceCount}/3 minimum`}
+          />
+        )}
         <ChecklistItem
           icon={Scale}
           label="License"

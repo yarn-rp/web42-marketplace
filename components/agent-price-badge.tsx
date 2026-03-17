@@ -14,7 +14,13 @@ export function AgentPriceBadge({
 }: AgentPriceBadgeProps) {
   if (priceCents === 0) {
     return (
-      <Badge variant="secondary" className={cn("font-mono", className)}>
+      <Badge
+        variant="secondary"
+        className={cn(
+          "font-mono border border-emerald-500/25 bg-emerald-500/15 text-emerald-400",
+          className
+        )}
+      >
         Free
       </Badge>
     )
@@ -28,7 +34,13 @@ export function AgentPriceBadge({
   }).format(priceCents / 100)
 
   return (
-    <Badge variant="secondary" className={cn("font-mono", className)}>
+    <Badge
+      variant="secondary"
+      className={cn(
+        "font-mono border border-white/25 bg-white/15 text-white",
+        className
+      )}
+    >
       {formatted}
     </Badge>
   )

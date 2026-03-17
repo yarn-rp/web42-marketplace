@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import type { AgentLicense } from "@/lib/types"
 import { updateAgentLicense } from "@/app/actions/agent"
+import { getAllowedLicenses } from "@/lib/license-utils"
 import {
   Card,
   CardContent,
@@ -25,6 +26,7 @@ import {
 interface AgentLicenseSelectProps {
   agentId: string
   currentLicense: AgentLicense | null
+  priceCents: number
   profileUsername: string
 }
 
@@ -64,11 +66,17 @@ const LICENSE_OPTIONS: { value: AgentLicense; label: string; description: string
 export function AgentLicenseSelect({
   agentId,
   currentLicense,
+  priceCents,
   profileUsername,
 }: AgentLicenseSelectProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [value, setValue] = useState<AgentLicense | "">(currentLicense ?? "")
+
+  const allowedLicenses = getAllowedLicenses(priceCents)
+  const filteredOptions = LICENSE_OPTIONS.filter((opt) =>
+    allowedLicenses.includes(opt.value)
+  )
 
   const handleChange = (newValue: string) => {
     const license = newValue as AgentLicense
@@ -93,7 +101,9 @@ export function AgentLicenseSelect({
           License
         </CardTitle>
         <CardDescription className="text-xs">
-          Choose how others can use your agent.
+          {priceCents === 0
+            ? "Free agents require an open-source license."
+            : "Paid agents require a commercial license."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -106,7 +116,7 @@ export function AgentLicenseSelect({
             <SelectValue placeholder="Select a license" />
           </SelectTrigger>
           <SelectContent>
-            {LICENSE_OPTIONS.map((opt) => (
+            {filteredOptions.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 <div className="flex flex-col">
                   <span>{opt.label}</span>

@@ -72,14 +72,14 @@ export function ProfileAgentGrid({
         </Tabs>
       )}
 
-      <div className="columns-1 space-y-3 md:columns-2 lg:columns-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredAgents.map((agent, index) => (
           <motion.div
             key={agent.id}
             layout
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative break-inside-avoid"
+            className="relative"
           >
             <AgentCard agent={agent} order={index} showPrice />
             {isOwner && (

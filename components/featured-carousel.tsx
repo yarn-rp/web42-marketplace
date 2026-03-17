@@ -23,7 +23,7 @@ export function FeaturedCarousel({ agents }: { agents: Agent[] }) {
             key={agent.id}
             className="basis-full sm:basis-1/2 lg:basis-1/3"
           >
-            <AgentCard agent={agent} order={i} trim />
+            <AgentCard agent={agent} order={i} />
           </CarouselItem>
         ))}
       </CarouselContent>

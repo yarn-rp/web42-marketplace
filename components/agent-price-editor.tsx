@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation"
 import { DollarSign } from "lucide-react"
 import { toast } from "sonner"
 
+import type { AgentLicense } from "@/lib/types"
 import { updateAgentPrice } from "@/app/actions/agent"
+import { isFreeLicense, isPaidLicense } from "@/lib/license-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,6 +22,7 @@ import { Input } from "@/components/ui/input"
 interface AgentPriceEditorProps {
   agentId: string
   currentPriceCents: number
+  currentLicense: AgentLicense | null
   currency: string
   profileUsername: string
 }
@@ -27,6 +30,7 @@ interface AgentPriceEditorProps {
 export function AgentPriceEditor({
   agentId,
   currentPriceCents,
+  currentLicense,
   currency,
   profileUsername,
 }: AgentPriceEditorProps) {
@@ -36,6 +40,11 @@ export function AgentPriceEditor({
   const [dollars, setDollars] = useState(
     currentPriceCents > 0 ? (currentPriceCents / 100).toFixed(2) : ""
   )
+
+  const hasLicenseConflict =
+    currentLicense != null &&
+    ((isFree && isPaidLicense(currentLicense)) ||
+      (!isFree && isFreeLicense(currentLicense)))
 
   const handleSave = () => {
     const cents = isFree ? 0 : Math.round(parseFloat(dollars || "0") * 100)
@@ -102,12 +111,19 @@ export function AgentPriceEditor({
           </div>
         )}
 
+        {hasLicenseConflict && (
+          <p className="text-xs text-destructive">
+            Current license ({currentLicense}) is not compatible with{" "}
+            {isFree ? "free" : "paid"} pricing. Change the license first.
+          </p>
+        )}
+
         <Button
           size="sm"
           variant="outline"
           className="w-full"
           onClick={handleSave}
-          disabled={isPending}
+          disabled={isPending || hasLicenseConflict}
         >
           {isPending ? "Saving..." : "Save Price"}
         </Button>
