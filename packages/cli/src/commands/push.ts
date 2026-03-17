@@ -138,17 +138,19 @@ export const pushCommand = new Command("push")
 
       let profile_image_data = undefined
       // Check for avatar/avatar.png or avatars/avatar.png
-      const avatarPaths = [
+      const avatarSearchPaths = [
         join(cwd, "avatar/avatar.png"),
         join(cwd, "avatars/avatar.png"),
         join(cwd, "avatar.png"),
+        // Also check .web42/ for the one managed by build/pack
+        join(cwd, ".web42/avatar.png"),
       ]
 
-      for (const ap of avatarPaths) {
+      for (const ap of avatarSearchPaths) {
         if (existsSync(ap)) {
           try {
             const stats = statSync(ap)
-            if (stats.size <= 2 * 1024 * 1024) {
+            if (stats.size <= 5 * 1024 * 1024) {
               profile_image_data = readFileSync(ap).toString("base64")
               break
             }
