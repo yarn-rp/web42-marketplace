@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import type { AgentLicense } from "@/lib/types"
 import { updateAgentPrice } from "@/app/actions/agent"
-import { isFreeLicense, isPaidLicense } from "@/lib/license-utils"
+import { getLicensePriceWarning } from "@/lib/license-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -41,10 +41,10 @@ export function AgentPriceEditor({
     currentPriceCents > 0 ? (currentPriceCents / 100).toFixed(2) : ""
   )
 
-  const hasLicenseConflict =
-    currentLicense != null &&
-    ((isFree && isPaidLicense(currentLicense)) ||
-      (!isFree && isFreeLicense(currentLicense)))
+  const priceCents = isFree ? 0 : Math.round(parseFloat(dollars || "0") * 100)
+  const licenseWarning = currentLicense
+    ? getLicensePriceWarning(currentLicense, priceCents)
+    : null
 
   const handleSave = () => {
     const cents = isFree ? 0 : Math.round(parseFloat(dollars || "0") * 100)
@@ -111,11 +111,8 @@ export function AgentPriceEditor({
           </div>
         )}
 
-        {hasLicenseConflict && (
-          <p className="text-xs text-destructive">
-            Current license ({currentLicense}) is not compatible with{" "}
-            {isFree ? "free" : "paid"} pricing. Change the license first.
-          </p>
+        {licenseWarning && (
+          <p className="text-xs text-amber-500">{licenseWarning}</p>
         )}
 
         <Button
@@ -123,7 +120,7 @@ export function AgentPriceEditor({
           variant="outline"
           className="w-full"
           onClick={handleSave}
-          disabled={isPending || hasLicenseConflict}
+          disabled={isPending}
         >
           {isPending ? "Saving..." : "Save Price"}
         </Button>

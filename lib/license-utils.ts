@@ -17,6 +17,17 @@ export function isPaidLicense(license: AgentLicense): boolean {
   return (PAID_LICENSES as string[]).includes(license)
 }
 
-export function getAllowedLicenses(priceCents: number): AgentLicense[] {
-  return priceCents === 0 ? FREE_LICENSES : PAID_LICENSES
+export function getAllowedLicenses(_priceCents: number): AgentLicense[] {
+  return [...FREE_LICENSES, ...PAID_LICENSES]
+}
+
+export function getLicensePriceWarning(
+  license: AgentLicense,
+  priceCents: number
+): string | null {
+  if (priceCents === 0 && isPaidLicense(license))
+    return "Commercial licenses are typically used with paid pricing. You will need to resolve this before publishing."
+  if (priceCents > 0 && isFreeLicense(license))
+    return "Open-source licenses are typically used with free pricing. You will need to resolve this before publishing."
+  return null
 }

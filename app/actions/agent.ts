@@ -669,27 +669,6 @@ export async function updateAgentPrice(
     return { error: "Minimum price is $5.00. Set to $0 for free." }
   }
 
-  const { data: agent } = await db
-    .from("agents")
-    .select("license")
-    .eq("id", agentId)
-    .eq("owner_id", user.id)
-    .single()
-
-  if (agent?.license) {
-    const license = agent.license as AgentLicense
-    if (priceCents === 0 && isPaidLicense(license)) {
-      return {
-        error: `Cannot set price to free while using a commercial license (${license}). Change the license first.`,
-      }
-    }
-    if (priceCents > 0 && isFreeLicense(license)) {
-      return {
-        error: `Cannot set a paid price while using an open-source license (${license}). Change the license first.`,
-      }
-    }
-  }
-
   if (priceCents > 0) {
     const { data: profile } = await db
       .from("users")
@@ -1085,23 +1064,6 @@ export async function updateAgentLicense(
   } = await db.auth.getUser()
 
   if (!user) return { error: "Not authenticated" }
-
-  if (license) {
-    const { data: agent } = await db
-      .from("agents")
-      .select("price_cents")
-      .eq("id", agentId)
-      .eq("owner_id", user.id)
-      .single()
-
-    const isFree = (agent?.price_cents ?? 0) === 0
-    if (isFree && isPaidLicense(license)) {
-      return { error: "Free agents must use an open-source license (MIT, Apache, GPL, BSD)." }
-    }
-    if (!isFree && isFreeLicense(license)) {
-      return { error: "Paid agents must use a commercial license (Proprietary or Custom)." }
-    }
-  }
 
   const { error } = await db
     .from("agents")

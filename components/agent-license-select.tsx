@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import type { AgentLicense } from "@/lib/types"
 import { updateAgentLicense } from "@/app/actions/agent"
-import { getAllowedLicenses } from "@/lib/license-utils"
+import { getLicensePriceWarning } from "@/lib/license-utils"
 import {
   Card,
   CardContent,
@@ -73,10 +73,8 @@ export function AgentLicenseSelect({
   const [isPending, startTransition] = useTransition()
   const [value, setValue] = useState<AgentLicense | "">(currentLicense ?? "")
 
-  const allowedLicenses = getAllowedLicenses(priceCents)
-  const filteredOptions = LICENSE_OPTIONS.filter((opt) =>
-    allowedLicenses.includes(opt.value)
-  )
+  const warning =
+    value && value !== "" ? getLicensePriceWarning(value, priceCents) : null
 
   const handleChange = (newValue: string) => {
     const license = newValue as AgentLicense
@@ -101,12 +99,10 @@ export function AgentLicenseSelect({
           License
         </CardTitle>
         <CardDescription className="text-xs">
-          {priceCents === 0
-            ? "Free agents require an open-source license."
-            : "Paid agents require a commercial license."}
+          Choose a license for your agent.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-2">
         <Select
           value={value}
           onValueChange={handleChange}
@@ -116,7 +112,7 @@ export function AgentLicenseSelect({
             <SelectValue placeholder="Select a license" />
           </SelectTrigger>
           <SelectContent>
-            {filteredOptions.map((opt) => (
+            {LICENSE_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 <div className="flex flex-col">
                   <span>{opt.label}</span>
@@ -128,6 +124,9 @@ export function AgentLicenseSelect({
             ))}
           </SelectContent>
         </Select>
+        {warning && (
+          <p className="text-xs text-amber-500">{warning}</p>
+        )}
       </CardContent>
     </Card>
   )
