@@ -7,37 +7,31 @@ import { Badge } from "@/components/ui/badge"
 interface CategoryPillProps {
   category: Category
   active?: boolean
-  preserveParams?: URLSearchParams
+  onClick?: () => void
 }
 
-export function CategoryPill({ category, active, preserveParams }: CategoryPillProps) {
-  const href = preserveParams
-    ? (() => {
-        const params = new URLSearchParams(preserveParams.toString())
-        params.delete("page")
-        if (category.name === "All") {
-          params.delete("category")
-        } else {
-          params.set("category", category.name)
-        }
-        const qs = params.toString()
-        return `/explore${qs ? `?${qs}` : ""}`
-      })()
-    : category.name === "All"
-      ? "/explore"
-      : `/explore?category=${category.name}`
-
-  return (
-    <Link href={href}>
-      <Badge
-        variant={active ? "default" : "outline"}
-        className={cn(
-          "cursor-pointer text-xs transition-colors hover:bg-accent hover:text-accent-foreground",
-          active && "hover:bg-primary/90"
-        )}
-      >
-        {category.name}
-      </Badge>
-    </Link>
+export function CategoryPill({ category, active, onClick }: CategoryPillProps) {
+  const content = (
+    <Badge
+      variant={active ? "default" : "outline"}
+      className={cn(
+        "cursor-pointer text-xs transition-colors hover:bg-accent hover:text-accent-foreground",
+        active && "hover:bg-primary/90"
+      )}
+    >
+      {category.name}
+    </Badge>
   )
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick}>
+        {content}
+      </button>
+    )
+  }
+
+  const href =
+    category.name === "All" ? "/explore" : `/explore?category=${category.name}`
+  return <Link href={href}>{content}</Link>
 }

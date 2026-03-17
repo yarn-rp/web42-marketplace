@@ -110,6 +110,51 @@ input:-webkit-autofill:active {
   -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, black 40%, transparent 100%);
 }
 
+/* MDXEditor theme overrides */
+.mdxeditor-wrapper .mdxeditor {
+  --accentBase: hsl(var(--primary));
+  --accentBgSubtle: hsl(var(--accent));
+  --accentBorder: hsl(var(--border));
+  --accentSolid: hsl(var(--primary));
+  --accentText: hsl(var(--primary));
+  --baseBase: hsl(var(--background));
+  --baseBgSubtle: hsl(var(--muted));
+  --baseBorder: hsl(var(--border));
+  --baseSolid: hsl(var(--muted-foreground));
+  --baseText: hsl(var(--foreground));
+  --baseTextContrast: hsl(var(--foreground));
+  font-family: inherit;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border-radius: 0;
+}
+
+.mdxeditor-wrapper .mdxeditor-toolbar {
+  background: hsl(var(--muted)) !important;
+  border-color: hsl(var(--border)) !important;
+  border-radius: 0 !important;
+}
+
+.mdxeditor-wrapper .mdxeditor-toolbar button,
+.mdxeditor-wrapper .mdxeditor-toolbar select {
+  color: hsl(var(--foreground));
+}
+
+.mdxeditor-wrapper .mdxeditor-toolbar button[data-state="on"],
+.mdxeditor-wrapper .mdxeditor-toolbar button:hover {
+  background: hsl(var(--accent));
+}
+
+.dark .mdxeditor-wrapper .mdxeditor-popup-container {
+  background: hsl(var(--popover));
+  border-color: hsl(var(--border));
+  color: hsl(var(--popover-foreground));
+}
+
+.mdxeditor-wrapper .mdxeditor-diff-source-wrapper {
+  background: hsl(var(--card));
+}
+
 /* Blinking cursor for terminal-style text */
 @keyframes blink {
   0%, 50% { opacity: 1; }

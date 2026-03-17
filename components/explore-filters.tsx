@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { SlidersHorizontal } from "lucide-react"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import type { Category } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -27,12 +28,35 @@ interface ExploreFiltersProps {
 }
 
 export function ExploreFilters({ categories }: ExploreFiltersProps) {
-  const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [open, setOpen] = useState(false)
+
+  const [platform, setPlatform] = useState<string | null>(null)
+  const [category, setCategory] = useState<string | null>(null)
+  const [minPrice, setMinPrice] = useState("")
+  const [maxPrice, setMaxPrice] = useState("")
+  const [minStars, setMinStars] = useState("")
+  const [publishedFrom, setPublishedFrom] = useState("")
+  const [creator, setCreator] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setPlatform(searchParams.get("platform"))
+      setCategory(searchParams.get("category"))
+      setMinPrice(searchParams.get("minPrice") ?? "")
+      setMaxPrice(searchParams.get("maxPrice") ?? "")
+      setMinStars(searchParams.get("minStars") ?? "")
+      setPublishedFrom(searchParams.get("publishedFrom") ?? "")
+      setCreator(searchParams.get("creator"))
+    }
+  }, [open, searchParams])
 
   const activeCategory = searchParams.get("category")
   const activePlatform = searchParams.get("platform")
-  const activePrice = searchParams.get("price")
+  const activeMinPrice = searchParams.get("minPrice")
+  const activeMaxPrice = searchParams.get("maxPrice")
   const activeMinStars = searchParams.get("minStars")
   const activePublishedFrom = searchParams.get("publishedFrom")
   const activeCreator = searchParams.get("creator")
@@ -40,16 +64,44 @@ export function ExploreFilters({ categories }: ExploreFiltersProps) {
   const activeCount =
     (activeCategory ? 1 : 0) +
     (activePlatform ? 1 : 0) +
-    (activePrice && activePrice !== "all" ? 1 : 0) +
+    (activeMinPrice || activeMaxPrice ? 1 : 0) +
     (activeMinStars ? 1 : 0) +
     (activePublishedFrom ? 1 : 0) +
     (activeCreator ? 1 : 0)
 
-  useEffect(() => {
-    setOpen(false)
-  }, [searchParams.toString()])
+  const handleApply = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("page")
 
-  const preserveParams = searchParams
+    if (platform) params.set("platform", platform)
+    else params.delete("platform")
+
+    if (category) params.set("category", category)
+    else params.delete("category")
+
+    let finalMin = minPrice
+    let finalMax = maxPrice
+    if (minPrice && maxPrice && parseInt(minPrice, 10) > parseInt(maxPrice, 10)) {
+      finalMin = maxPrice
+      finalMax = minPrice
+    }
+    if (finalMin) params.set("minPrice", finalMin)
+    else params.delete("minPrice")
+    if (finalMax) params.set("maxPrice", finalMax)
+    else params.delete("maxPrice")
+
+    if (minStars) params.set("minStars", minStars)
+    else params.delete("minStars")
+
+    if (publishedFrom) params.set("publishedFrom", publishedFrom)
+    else params.delete("publishedFrom")
+
+    if (creator) params.set("creator", creator)
+    else params.delete("creator")
+
+    router.replace(`${pathname}?${params.toString()}`)
+    setOpen(false)
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -75,7 +127,7 @@ export function ExploreFilters({ categories }: ExploreFiltersProps) {
             <Label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Platform
             </Label>
-            <PlatformFilter />
+            <PlatformFilter value={platform} onChange={setPlatform} />
           </div>
           {categories.length > 0 && (
             <div>
@@ -90,15 +142,15 @@ export function ExploreFilters({ categories }: ExploreFiltersProps) {
                     icon: null,
                     created_at: "",
                   }}
-                  active={!activeCategory}
-                  preserveParams={preserveParams}
+                  active={!category}
+                  onClick={() => setCategory(null)}
                 />
                 {categories.map((cat) => (
                   <CategoryPill
                     key={cat.id}
                     category={cat}
-                    active={activeCategory === cat.name}
-                    preserveParams={preserveParams}
+                    active={category === cat.name}
+                    onClick={() => setCategory(cat.name)}
                   />
                 ))}
               </div>
@@ -108,27 +160,35 @@ export function ExploreFilters({ categories }: ExploreFiltersProps) {
             <Label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Price
             </Label>
-            <PriceFilter />
+            <PriceFilter
+              minPrice={minPrice}
+              maxPrice={maxPrice}
+              onMinPriceChange={setMinPrice}
+              onMaxPriceChange={setMaxPrice}
+            />
           </div>
           <div>
             <Label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Star rating
             </Label>
-            <StarRatingFilter />
+            <StarRatingFilter value={minStars} onChange={setMinStars} />
           </div>
           <div>
             <Label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Published from
             </Label>
-            <PublishedFromFilter />
+            <PublishedFromFilter value={publishedFrom} onChange={setPublishedFrom} />
           </div>
           <div>
             <Label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Creator
             </Label>
-            <CreatorFilter />
+            <CreatorFilter value={creator} onChange={setCreator} />
           </div>
         </div>
+        <DialogFooter>
+          <Button onClick={handleApply}>Apply</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

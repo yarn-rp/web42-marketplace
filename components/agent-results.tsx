@@ -12,7 +12,8 @@ interface AgentResultsProps {
   tag?: string
   sort?: SortOption
   platform?: string
-  price?: string
+  minPrice?: string
+  maxPrice?: string
   minStars?: string
   publishedFrom?: string
   creator?: string
@@ -25,7 +26,8 @@ export async function AgentResults({
   tag,
   sort,
   platform,
-  price,
+  minPrice,
+  maxPrice,
   minStars,
   publishedFrom,
   creator,
@@ -38,7 +40,8 @@ export async function AgentResults({
     tag,
     sort,
     platform,
-    price,
+    minPrice,
+    maxPrice,
     minStars,
     publishedFrom,
     creator,
@@ -51,7 +54,8 @@ export async function AgentResults({
     category ||
     tag ||
     platform ||
-    price ||
+    minPrice ||
+    maxPrice ||
     minStars ||
     publishedFrom ||
     creator
@@ -64,7 +68,8 @@ export async function AgentResults({
   if (tag) searchParams.set("tag", tag)
   if (sort) searchParams.set("sort", sort)
   if (platform) searchParams.set("platform", platform)
-  if (price) searchParams.set("price", price)
+  if (minPrice) searchParams.set("minPrice", minPrice)
+  if (maxPrice) searchParams.set("maxPrice", maxPrice)
   if (minStars) searchParams.set("minStars", minStars)
   if (publishedFrom) searchParams.set("publishedFrom", publishedFrom)
   if (creator) searchParams.set("creator", creator)

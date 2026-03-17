@@ -1,7 +1,5 @@
 "use client"
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-
 import {
   Select,
   SelectContent,
@@ -17,25 +15,14 @@ const starOptions = [
   { value: "10", label: "10+ stars" },
 ] as const
 
-export function StarRatingFilter() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const current = searchParams.get("minStars") || ""
+interface StarRatingFilterProps {
+  value: string
+  onChange: (value: string) => void
+}
 
-  const handleChange = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete("page")
-    if (value) {
-      params.set("minStars", value)
-    } else {
-      params.delete("minStars")
-    }
-    router.replace(`${pathname}?${params.toString()}`)
-  }
-
+export function StarRatingFilter({ value, onChange }: StarRatingFilterProps) {
   return (
-    <Select value={current || "any"} onValueChange={(v) => handleChange(v === "any" ? "" : v)}>
+    <Select value={value || "any"} onValueChange={(v) => onChange(v === "any" ? "" : v)}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Star rating" />
       </SelectTrigger>

@@ -76,7 +76,8 @@ export const getAgents = cache(
     tag?: string,
     sort: SortOption = "trending",
     platform?: string,
-    price?: string,
+    minPrice?: string,
+    maxPrice?: string,
     minStars?: string,
     publishedFrom?: string,
     creator?: string,
@@ -156,10 +157,13 @@ export const getAgents = cache(
       }
     }
 
-    if (price === "free") {
-      query = query.eq("price_cents", 0)
-    } else if (price === "paid") {
-      query = query.gt("price_cents", 0)
+    if (minPrice) {
+      const min = parseInt(minPrice, 10)
+      if (!isNaN(min)) query = query.gte("price_cents", min)
+    }
+    if (maxPrice) {
+      const max = parseInt(maxPrice, 10)
+      if (!isNaN(max)) query = query.lte("price_cents", max)
     }
 
     if (minStars) {
@@ -932,6 +936,48 @@ export async function reorderAgentResources(
 // ============================================================
 // Agent metadata updates (profile image, license, tags)
 // ============================================================
+
+export async function updateAgentDetails(
+  agentId: string,
+  fields: { name?: string; description?: string },
+  profileUsername: string
+) {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const update: Record<string, string> = {}
+  if (fields.name !== undefined) {
+    const trimmed = fields.name.trim()
+    if (!trimmed) return { error: "Name cannot be empty" }
+    if (trimmed.length > 100) return { error: "Name must be 100 characters or fewer" }
+    update.name = trimmed
+  }
+  if (fields.description !== undefined) {
+    if (fields.description.length > 500)
+      return { error: "Description must be 500 characters or fewer" }
+    update.description = fields.description.trim()
+  }
+
+  if (Object.keys(update).length === 0) return { error: "Nothing to update" }
+
+  const { error } = await db
+    .from("agents")
+    .update(update)
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error updating agent details:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
 
 export async function updateAgentReadme(
   agentId: string,

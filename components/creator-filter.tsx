@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Check, ChevronsUpDown, X } from "lucide-react"
 
 import { searchCreators, type CreatorSearchResult } from "@/app/actions/filters"
@@ -21,28 +20,26 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
-export function CreatorFilter() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+interface CreatorFilterProps {
+  value: string | null
+  onChange: (username: string | null) => void
+}
+
+export function CreatorFilter({ value, onChange }: CreatorFilterProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [creators, setCreators] = useState<CreatorSearchResult[]>([])
-  const [loading, setLoading] = useState(false)
-
-  const activeCreator = searchParams.get("creator")
 
   const fetchCreators = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
       setCreators([])
       return
     }
-    setLoading(true)
     try {
       const results = await searchCreators(q)
       setCreators(results)
-    } finally {
-      setLoading(false)
+    } catch {
+      setCreators([])
     }
   }, [])
 
@@ -52,27 +49,19 @@ export function CreatorFilter() {
   }, [query, fetchCreators])
 
   const handleSelect = (username: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete("page")
-    params.set("creator", username)
-    router.replace(`${pathname}?${params.toString()}`)
+    onChange(username)
     setOpen(false)
     setQuery("")
   }
 
-  const handleClear = () => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete("page")
-    params.delete("creator")
-    router.replace(`${pathname}?${params.toString()}`)
+  const handleClear = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onChange(null)
     setOpen(false)
   }
 
-  const displayValue = activeCreator
-    ? creators.find((c) => c.username === activeCreator)?.full_name ||
-      creators.find((c) => c.username === activeCreator)?.username ||
-      activeCreator
-    : null
+  const displayValue = value || null
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -89,11 +78,7 @@ export function CreatorFilter() {
               <button
                 type="button"
                 className="rounded p-0.5 opacity-50 hover:opacity-100"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  handleClear()
-                }}
+                onClick={handleClear}
                 aria-label="Clear creator"
               >
                 <X className="size-3.5" />
@@ -114,7 +99,7 @@ export function CreatorFilter() {
           />
           <CommandList>
             <CommandEmpty>
-              {loading ? "Searching..." : query.length < 2 ? "Type to search..." : "No creators found."}
+              {query.length < 2 ? "Type to search..." : "No creators found."}
             </CommandEmpty>
             <CommandGroup>
               {creators.map((creator) => (
@@ -126,7 +111,7 @@ export function CreatorFilter() {
                   <Check
                     className={cn(
                       "mr-2 size-4",
-                      activeCreator === creator.username ? "opacity-100" : "opacity-0"
+                      value === creator.username ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {creator.full_name || creator.username || "Unknown"}

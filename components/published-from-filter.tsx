@@ -1,7 +1,5 @@
 "use client"
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-
 import {
   Select,
   SelectContent,
@@ -17,28 +15,14 @@ const publishedOptions = [
   { value: "90", label: "Last 90 days" },
 ] as const
 
-export function PublishedFromFilter() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const current = searchParams.get("publishedFrom") || ""
+interface PublishedFromFilterProps {
+  value: string
+  onChange: (value: string) => void
+}
 
-  const handleChange = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete("page")
-    if (value) {
-      params.set("publishedFrom", value)
-    } else {
-      params.delete("publishedFrom")
-    }
-    router.replace(`${pathname}?${params.toString()}`)
-  }
-
+export function PublishedFromFilter({ value, onChange }: PublishedFromFilterProps) {
   return (
-    <Select
-      value={current || "any"}
-      onValueChange={(v) => handleChange(v === "any" ? "" : v)}
-    >
+    <Select value={value || "any"} onValueChange={(v) => onChange(v === "any" ? "" : v)}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Published" />
       </SelectTrigger>

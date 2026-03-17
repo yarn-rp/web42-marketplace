@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import dynamic from "next/dynamic"
+import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import type { MDXEditorMethods } from "@mdxeditor/editor"
 import {
   BookOpen,
   FileIcon,
@@ -48,14 +48,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { AgentDeleteButton } from "./agent-delete-button"
+import { AgentDetailsEditor } from "./agent-details-editor"
 import { AgentLicenseSelect } from "./agent-license-select"
 import { AgentPriceEditor } from "./agent-price-editor"
 import { AgentProfileImage } from "./agent-profile-image"
 import { AgentResourceUpload } from "./agent-resource-upload"
 import { AgentTagManager } from "./agent-tag-manager"
+import { ForwardRefEditor } from "./forward-ref-editor"
 import { MarkdownRenderer } from "./markdown-renderer"
-
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false })
 
 interface AgentDetailTabsProps {
   agent: Agent
@@ -130,6 +130,7 @@ function ReadmeTab({
   profileUsername: string
 }) {
   const router = useRouter()
+  const editorRef = useRef<MDXEditorMethods>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -137,9 +138,8 @@ function ReadmeTab({
     readme ||
     files.find((f) => /^readme\.md$/i.test(f.path))?.content
 
-  const [draft, setDraft] = useState(readmeContent ?? "")
-
   const handleSave = () => {
+    const draft = editorRef.current?.getMarkdown() ?? ""
     startTransition(async () => {
       const result = await updateAgentReadme(agentId, draft, profileUsername)
       if (result.error) {
@@ -153,7 +153,6 @@ function ReadmeTab({
   }
 
   const handleCancel = () => {
-    setDraft(readmeContent ?? "")
     setIsEditing(false)
   }
 
@@ -207,12 +206,12 @@ function ReadmeTab({
         </CardHeader>
         <Separator />
         <CardContent className="p-0">
-          <div data-color-mode="dark">
-            <MDEditor
-              value={draft}
-              onChange={(val) => setDraft(val ?? "")}
-              height={500}
-              preview="live"
+          <div className="mdxeditor-wrapper [&_.mdxeditor]:border-0 [&_.mdxeditor]:bg-background [&_.mdxeditor-toolbar]:bg-muted/50 [&_.mdxeditor-toolbar]:border-b [&_.mdxeditor-toolbar]:border-border [&_.mdxeditor-root-contenteditable]:min-h-[400px] [&_.mdxeditor-root-contenteditable]:px-6 [&_.mdxeditor-root-contenteditable]:py-4">
+            <ForwardRefEditor
+              ref={editorRef}
+              markdown={readmeContent ?? ""}
+              contentEditableClassName="prose prose-sm dark:prose-invert max-w-none"
+              onChange={() => {}}
             />
           </div>
         </CardContent>
@@ -230,10 +229,7 @@ function ReadmeTab({
             variant="ghost"
             size="sm"
             className="ml-auto"
-            onClick={() => {
-              setDraft(readmeContent ?? "")
-              setIsEditing(true)
-            }}
+            onClick={() => setIsEditing(true)}
           >
             <Pencil className="mr-1 size-3.5" />
             Edit
@@ -445,6 +441,12 @@ function SettingsTab({
 }) {
   return (
     <div className="space-y-6">
+      <AgentDetailsEditor
+        agentId={agent.id}
+        currentName={agent.name}
+        currentDescription={agent.description}
+        profileUsername={profileUsername}
+      />
       <div className="grid gap-4 md:grid-cols-2">
         <AgentProfileImage
           agentId={agent.id}
