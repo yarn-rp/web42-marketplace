@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     license,
     visibility,
     tags,
+    profile_image_data,
   } = body
 
   if (!slug || !name) {
@@ -99,6 +100,36 @@ export async function POST(request: Request) {
   if (currency !== undefined) agentFields.currency = currency
   if (license !== undefined) agentFields.license = license
   if (visibility !== undefined) agentFields.visibility = visibility
+
+  if (profile_image_data) {
+    try {
+      let base64 = profile_image_data.trim()
+      const dataUriMatch = base64.match(/^data:([^;]+);base64,(.*)$/)
+      if (dataUriMatch) {
+        base64 = dataUriMatch[2]
+      }
+
+      const buffer = Buffer.from(base64, "base64")
+      if (buffer.length > 0 && buffer.length <= 2 * 1024 * 1024) {
+        const safeSlug = slug.replace(/[^a-zA-Z0-9_-]/g, "_")
+        const { data: uploadData, error: uploadError } = await adminDb.storage
+          .from("agent-covers")
+          .upload(`${userId}/${safeSlug}/avatar.png`, buffer, {
+            contentType: "image/png",
+            upsert: true,
+          })
+
+        if (!uploadError) {
+          const { data: publicUrl } = adminDb.storage
+            .from("agent-covers")
+            .getPublicUrl(uploadData.path)
+          agentFields.profile_image_url = publicUrl.publicUrl
+        }
+      }
+    } catch (e) {
+      console.error("Error processing profile image data:", e)
+    }
+  }
 
   const { data: existing } = await adminDb
     .from("agents")

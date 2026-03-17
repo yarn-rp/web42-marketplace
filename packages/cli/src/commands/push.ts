@@ -136,6 +136,28 @@ export const pushCommand = new Command("push")
         readme = readFileSync(readmePath, "utf-8")
       }
 
+      let profile_image_data = undefined
+      // Check for avatar/avatar.png or avatars/avatar.png
+      const avatarPaths = [
+        join(cwd, "avatar/avatar.png"),
+        join(cwd, "avatars/avatar.png"),
+        join(cwd, "avatar.png"),
+      ]
+
+      for (const ap of avatarPaths) {
+        if (existsSync(ap)) {
+          try {
+            const stats = statSync(ap)
+            if (stats.size <= 2 * 1024 * 1024) {
+              profile_image_data = readFileSync(ap).toString("base64")
+              break
+            }
+          } catch (e) {
+            // Skip
+          }
+        }
+      }
+
       const agentResult = await apiPost<{
         agent: { id: string }
         created?: boolean
@@ -147,6 +169,7 @@ export const pushCommand = new Command("push")
         readme,
         manifest,
         demo_video_url: manifest.demoVideoUrl,
+        profile_image_data,
       })
 
       agentId = agentResult.agent.id
