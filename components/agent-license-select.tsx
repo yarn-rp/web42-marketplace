@@ -74,7 +74,7 @@ export function AgentLicenseSelect({
   const [value, setValue] = useState<AgentLicense | "">(currentLicense ?? "")
 
   const warning =
-    value && value !== "" ? getLicensePriceWarning(value, priceCents) : null
+    value && (value as string) !== "" ? getLicensePriceWarning(value, priceCents) : null
 
   const handleChange = (newValue: string) => {
     const license = newValue as AgentLicense
