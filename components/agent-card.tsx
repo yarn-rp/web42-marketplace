@@ -33,7 +33,6 @@ export function AgentCard({
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
   const href = `/${username}/${agent.slug}`
-  const primaryCategory = agent.categories?.[0]
   const platformInfo = getPlatform(agent.manifest?.platform)
   const sortedResources = [...(agent.resources ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order
@@ -85,23 +84,15 @@ export function AgentCard({
                 )}
               </div>
             )}
-            <div className="absolute right-3 top-3 flex gap-1.5">
-              {showPrice && (
+            {showPrice && (
+              <div className="absolute right-3 top-3">
                 <AgentPriceBadge
                   priceCents={agent.price_cents ?? 0}
                   currency={agent.currency}
-                  className="text-xs backdrop-blur-sm"
+                  className="text-xs"
                 />
-              )}
-              {primaryCategory && (
-                <Badge
-                  variant="secondary"
-                  className="text-xs backdrop-blur-sm"
-                >
-                  {primaryCategory.name}
-                </Badge>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* 2. Identity -- avatar + name + username */}

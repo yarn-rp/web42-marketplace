@@ -17,7 +17,7 @@ export function AgentPriceBadge({
       <Badge
         variant="secondary"
         className={cn(
-          "font-mono border border-emerald-500/25 bg-emerald-500/15 text-emerald-400",
+          "font-mono border border-emerald-500/30 bg-black/70 text-emerald-400 backdrop-blur-md shadow-sm",
           className
         )}
       >
@@ -37,7 +37,7 @@ export function AgentPriceBadge({
     <Badge
       variant="secondary"
       className={cn(
-        "font-mono border border-white/25 bg-white/15 text-white",
+        "font-mono border border-white/20 bg-black/70 text-white backdrop-blur-md shadow-sm",
         className
       )}
     >

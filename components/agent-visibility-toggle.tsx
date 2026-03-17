@@ -59,7 +59,7 @@ export function AgentVisibilityToggle({
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 gap-1.5 px-2"
+          className="h-8 gap-1.5 px-2 border border-white/20 bg-black/70 text-white backdrop-blur-md shadow-sm hover:bg-black/80 hover:text-white"
           disabled={isPending}
         >
           <VisibilityIcon visibility={visibility} />
