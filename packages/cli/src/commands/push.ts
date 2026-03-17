@@ -40,7 +40,8 @@ function mimeFromExtension(ext: string): string {
 export const pushCommand = new Command("push")
   .description("Push your agent package to the Web42 marketplace")
   .option("--force", "Skip hash comparison and always push")
-  .action(async (opts: { force?: boolean }) => {
+  .option("--force-avatar", "Explicitly upload avatar even if no other changes")
+  .action(async (opts: { force?: boolean; forceAvatar?: boolean }) => {
     const config = requireAuth()
     const cwd = process.cwd()
     const manifestPath = join(cwd, "manifest.json")
@@ -190,7 +191,7 @@ export const pushCommand = new Command("push")
     // -----------------------------------------------------------------------
     // Step 4: Compare local hash with last known local hash (unless --force)
     // -----------------------------------------------------------------------
-    if (!opts.force && !isCreated && syncState?.last_local_hash) {
+    if (!opts.force && !opts.forceAvatar && !isCreated && syncState?.last_local_hash) {
       if (localHash === syncState.last_local_hash) {
         spinner.succeed(
           `${chalk.bold(`@${config.username}/${manifest.name}`)} has no local changes since last sync.`
