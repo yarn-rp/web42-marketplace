@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/db/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-export const dynamic = "force-dynamic"import { authenticateRequest } from "@/lib/auth/cli-auth"
+import { authenticateRequest } from "@/lib/auth/cli-auth"
 
-export const dynamic = 'force-dynamic'
-
-// Remove top-level supabaseAdmin client
-// Create supabaseAdmin inside handlers using runtime env variables
+export const dynamic = "force-dynamic"
 
 
 // GET /api/agents/[id]/files - get file manifest (optionally with content)

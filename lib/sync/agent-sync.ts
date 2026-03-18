@@ -3,10 +3,12 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 import type { AgentSnapshot } from "@/lib/types"
 
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export function sha256(input: string): string {
   return createHash("sha256").update(input, "utf-8").digest("hex")
@@ -57,6 +59,7 @@ export function computeHashFromSnapshot(snapshot: AgentSnapshot): string {
 export async function fetchAgentSnapshot(
   agentId: string
 ): Promise<{ snapshot: AgentSnapshot; updated_at: string } | null> {
+  const supabaseAdmin = getSupabaseAdmin()
   const { data: agent, error: agentError } = await supabaseAdmin
     .from("agents")
     .select("*")

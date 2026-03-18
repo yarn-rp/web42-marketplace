@@ -2,10 +2,12 @@ import { createHash } from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/db/supabase/server"
 
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 interface AuthResult {
   userId: string
@@ -25,6 +27,7 @@ export async function authenticateRequest(
     const rawToken = authHeader.slice(7)
     const tokenHash = createHash("sha256").update(rawToken).digest("hex")
 
+    const supabaseAdmin = getSupabaseAdmin()
     const { data: tokenRow } = await supabaseAdmin
       .from("cli_tokens")
       .select("id, user_id, expires_at")
