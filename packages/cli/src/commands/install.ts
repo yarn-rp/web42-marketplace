@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "fs"
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
@@ -26,6 +26,7 @@ interface MarketplaceInstallResult {
       modelPreferences?: { primary?: string }
     }
     owner: { username: string }
+    profile_image_url: string | null
   }
   files: Array<{
     path: string
@@ -252,6 +253,22 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
         )
 
         spinner.stop()
+
+        const profileImageUrl = result.agent.profile_image_url
+        if (profileImageUrl) {
+          try {
+            const avatarsDir = join(workspacePath, "avatars")
+            mkdirSync(avatarsDir, { recursive: true })
+            const avatarPath = join(avatarsDir, "avatar.png")
+            const avatarResponse = await fetch(profileImageUrl)
+            if (avatarResponse.ok) {
+              const buffer = Buffer.from(await avatarResponse.arrayBuffer())
+              writeFileSync(avatarPath, buffer)
+            }
+          } catch {
+            // Non-fatal — avatar download failure shouldn't block install
+          }
+        }
 
         console.log()
         console.log(
