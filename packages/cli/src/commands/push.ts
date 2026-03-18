@@ -13,6 +13,7 @@ import {
   computeHashFromSnapshot,
   findLocalAvatar,
   findAgentAvatar,
+  discoverResources,
   readResourcesMeta,
   readSyncState,
   writeSyncState,
@@ -237,38 +238,46 @@ export const pushCommand = new Command("push")
       // -------------------------------------------------------------------
       // Step 7: Upload resources if present
       // -------------------------------------------------------------------
-      const resourcesMeta = readResourcesMeta(cwd)
-      if (resourcesMeta.length > 0) {
-        spinner.text = "Uploading resources..."
-        const resForm = new FormData()
+      const resourcesMeta = readResourcesMeta(cwd);
+      const discoveredResources = discoverResources(cwd);
+      const allResources = [...resourcesMeta, ...discoveredResources];
 
-        const metadataForApi = resourcesMeta.map((meta, i) => ({
+      if (allResources.length > 0) {
+        spinner.text = "Uploading resources...";
+        const resForm = new FormData();
+
+        const metadataForApi = allResources.map((meta, i) => ({
           file_key: `resource_${i}`,
           title: meta.title,
           description: meta.description,
           type: meta.type,
           sort_order: meta.sort_order,
-        }))
-        resForm.append("metadata", JSON.stringify(metadataForApi))
+        }));
+        resForm.append("metadata", JSON.stringify(metadataForApi));
 
-        for (let i = 0; i < resourcesMeta.length; i++) {
-          const meta = resourcesMeta[i]
-          const resFilePath = join(cwd, ".web42", "resources", meta.file)
+        for (let i = 0; i < allResources.length; i++) {
+          const meta = allResources[i];
+          // Try .web42/resources/ first (legacy/tracked), then root resources/
+          let resFilePath = join(cwd, ".web42", "resources", meta.file);
+          if (!existsSync(resFilePath)) {
+            resFilePath = join(cwd, "resources", meta.file);
+          }
+
           if (existsSync(resFilePath)) {
-            const resBuffer = readFileSync(resFilePath)
-            const ext = meta.file.split(".").pop() ?? ""
+            const resBuffer = readFileSync(resFilePath);
+            const ext = meta.file.split(".").pop() ?? "";
             const blob = new Blob([resBuffer], {
               type: mimeFromExtension(ext),
-            })
-            resForm.append(`resource_${i}`, blob, meta.file)
+            });
+            resForm.append(`resource_${i}`, blob, meta.file);
           }
         }
 
         const resResult = await apiFormData<ResourcesUploadResponse>(
           `/api/agents/${agentId}/sync/resources`,
           resForm
-        )
-        finalHash = resResult.hash
+        );
+        finalHash = resResult.hash;
       }
 
       // -------------------------------------------------------------------

@@ -156,8 +156,48 @@ export function findAgentAvatar(cwd: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// .web42/resources.json + .web42/resources/
+// .web42/resources.json + .web42/resources/ + root resources/
 // ---------------------------------------------------------------------------
+
+const RESOURCE_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "svg"];
+const RESOURCE_VIDEO_EXTENSIONS = ["mp4", "webm"];
+
+export function discoverResources(cwd: string): ResourceMeta[] {
+  const resourcesDir = join(cwd, "resources");
+  if (!existsSync(resourcesDir)) return [];
+
+  const meta: ResourceMeta[] = [];
+  const entries = readdirSync(resourcesDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
+    if (entry.isDirectory()) continue;
+
+    const ext = entry.name.split(".").pop()?.toLowerCase() || "";
+    let type: "image" | "video" | "document" | null = null;
+
+    if (RESOURCE_IMAGE_EXTENSIONS.includes(ext)) {
+      type = "image";
+    } else if (RESOURCE_VIDEO_EXTENSIONS.includes(ext)) {
+      type = "video";
+    }
+
+    if (!type) {
+      throw new Error(
+        `Unsupported file type in resources/ folder: ${entry.name}. Only images and videos are allowed.`
+      );
+    }
+
+    meta.push({
+      file: entry.name,
+      title: entry.name.split(".").slice(0, -1).join("."),
+      type,
+      sort_order: meta.length,
+    });
+  }
+
+  return meta;
+}
 
 export function readResourcesMeta(cwd: string): ResourceMeta[] {
   const p = join(cwd, ".web42", "resources.json")
