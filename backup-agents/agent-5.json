@@ -1,0 +1,16 @@
+{
+  "agent": {
+    "slug": "agent-5",
+    "owner": "user-z-777"
+  },
+  "orders": [
+    {
+      "id": "order-1",
+      "agentSlug": "agent-5"
+    },
+    {
+      "id": "order-2",
+      "agentSlug": "agent-5"
+    }
+  ]
+}

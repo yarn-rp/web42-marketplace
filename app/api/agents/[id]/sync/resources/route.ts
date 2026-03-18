@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-
 import { authenticateRequest } from "@/lib/auth/cli-auth"
 import { computeAgentHash } from "@/lib/sync/agent-sync"
 
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = "force-dynamic"
 
 interface ResourceMeta {
   file_key: string
@@ -21,6 +17,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const auth = await authenticateRequest(request)
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

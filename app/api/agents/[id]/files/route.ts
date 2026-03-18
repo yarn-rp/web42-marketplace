@@ -3,10 +3,8 @@ import { createClient } from "@/db/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { authenticateRequest } from "@/lib/auth/cli-auth"
 
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = "force-dynamic"
+
 
 // GET /api/agents/[id]/files - get file manifest (optionally with content)
 export async function GET(
@@ -14,6 +12,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const db = await createClient()
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const url = new URL(request.url)
   const includeContent = url.searchParams.get("include_content") === "true"
 
@@ -58,6 +60,11 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const auth = await authenticateRequest(request)
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

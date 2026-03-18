@@ -2,16 +2,18 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/db/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = "force-dynamic"
 
 // POST /api/agents/[id]/remix - create a remix of an agent
 export async function POST(
   _request: Request,
   { params }: { params: { id: string } }
 ) {
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const db = await createClient()
   const {
     data: { user },
