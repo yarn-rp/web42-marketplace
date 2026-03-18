@@ -4,6 +4,8 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { authenticateRequest } from "@/lib/auth/cli-auth"
 import { computeAgentHash } from "@/lib/sync/agent-sync"
 
+export const dynamic = "force-dynamic"
+
 // GET /api/agents - list agents
 export async function GET(request: Request) {
   const db = await createClient()

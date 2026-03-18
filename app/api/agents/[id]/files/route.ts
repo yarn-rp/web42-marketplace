@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/db/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { authenticateRequest } from "@/lib/auth/cli-auth"
+export const dynamic = "force-dynamic"import { authenticateRequest } from "@/lib/auth/cli-auth"
 
 export const dynamic = 'force-dynamic'
 
