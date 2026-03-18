@@ -56,6 +56,7 @@ export function TopNav({ profile }: { profile: Profile | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [navValue, setNavValue] = useState("")
   const { setTheme } = useTheme()
 
   const handleLogout = async () => {
@@ -91,9 +92,18 @@ export function TopNav({ profile }: { profile: Profile | null }) {
 
         {/* Center: Nav (absolutely positioned for true centering) */}
         <div className="pointer-events-none absolute inset-0 hidden items-center justify-center sm:flex">
-          <NavigationMenu className="pointer-events-auto">
+          <NavigationMenu
+            className="pointer-events-auto"
+            value={navValue}
+            onValueChange={setNavValue}
+          >
             <NavigationMenuList>
-              <MarketplaceNavItem profile={profile} pathname={pathname} />
+              <MarketplaceNavItem
+                profile={profile}
+                pathname={pathname}
+                navValue={navValue}
+                onNavValueChange={setNavValue}
+              />
               {baseNavLinks.map((link) => (
                 <NavigationMenuItem key={link.href}>
                   <Link href={link.href} legacyBehavior passHref>

@@ -67,9 +67,13 @@ const marketplaceItems: Array<
 export function MarketplaceNavItem({
   profile,
   pathname,
+  navValue,
+  onNavValueChange,
 }: {
   profile: Profile | null
   pathname: string
+  navValue: string
+  onNavValueChange: (value: string) => void
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState<MarketplaceType | null>(null)
@@ -106,6 +110,12 @@ export function MarketplaceNavItem({
             ? "bg-accent text-accent-foreground"
             : "text-muted-foreground"
         )}
+        onClick={(e) => {
+          // Prevent Radix from toggling closed on click when already open
+          if (navValue !== "") {
+            e.preventDefault()
+          }
+        }}
       >
         Marketplace
       </NavigationMenuTrigger>
