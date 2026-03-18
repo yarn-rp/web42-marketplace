@@ -53,6 +53,7 @@ export async function POST(
       name: agent.name,
       manifest: agent.manifest,
       owner: agent.owner,
+      profile_image_url: agent.profile_image_url ?? null,
     },
     files: agent.files,
   })
