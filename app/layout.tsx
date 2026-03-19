@@ -52,12 +52,21 @@ export const metadata = {
     type: "website",
     siteName: "Web42",
     url: defaultUrl,
+    images: [
+      {
+        url: "/assets/logo/web42-mark-black.png",
+        width: 512,
+        height: 512,
+        alt: "Web42 — The AI Agent Marketplace",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image" as const,
     title: "Web42 — The AI Agent Marketplace",
     description:
       "Install expert-built AI agents in seconds or publish your own and earn. Platform-native agents for OpenClaw and more.",
+    images: ["/assets/logo/web42-mark-black.png"],
   },
   alternates: {
     canonical: defaultUrl,
