@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, readdirSync } from "fs"
-import { basename, join } from "path"
+import path, { basename, join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
 import ora from "ora"
@@ -185,7 +185,16 @@ async function pushSingleAgent(opts: {
   // Step 3: Build local snapshot and compute hash
   // -----------------------------------------------------------------------
   spinner.text = "Building snapshot..."
-  const snapshot = buildLocalSnapshot(syncDir.includes(".web42") ? syncDir : cwd, distDir)
+  // Determine whether syncDir is a .web42 subdirectory using path semantics,
+  // not string matching (avoids false positives when project path itself contains ".web42").
+  const relSyncDir = path.relative(cwd, syncDir)
+  const syncDirIsWeb42Subdir =
+    Boolean(relSyncDir) &&
+    !relSyncDir.startsWith("..") &&
+    !path.isAbsolute(relSyncDir) &&
+    relSyncDir.split(path.sep).includes(".web42")
+
+  const snapshot = buildLocalSnapshot(syncDirIsWeb42Subdir ? syncDir : cwd, distDir)
 
   const localHash = computeHashFromSnapshot(snapshot)
 
