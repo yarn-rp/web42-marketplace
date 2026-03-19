@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, readdirSync } from "fs"
 import { basename, join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
@@ -6,7 +6,7 @@ import ora from "ora"
 
 import { apiPost, apiFormData } from "../utils/api.js"
 import { requireAuth } from "../utils/config.js"
-import { openclawAdapter } from "../platforms/openclaw/adapter.js"
+import { resolvePlatform } from "../platforms/registry.js"
 import { parseSkillMd } from "../utils/skill.js"
 import {
   buildLocalSnapshot,
@@ -38,115 +38,113 @@ function mimeFromExtension(ext: string): string {
   return map[ext.toLowerCase()] ?? "application/octet-stream"
 }
 
-export const pushCommand = new Command("push")
-  .description("Push your agent package to the Web42 marketplace")
-  .option("--force", "Skip hash comparison and always push")
-  .option("--force-avatar", "Explicitly upload avatar even if no other changes")
-  .action(async (opts: { force?: boolean; forceAvatar?: boolean }) => {
-    const config = requireAuth()
-    const cwd = process.cwd()
-    const manifestPath = join(cwd, "manifest.json")
+/**
+ * Push a single agent to the marketplace.
+ * This encapsulates steps 1-8 of the push flow.
+ */
+async function pushSingleAgent(opts: {
+  cwd: string
+  manifest: Record<string, unknown>
+  distDir: string
+  syncDir: string // where sync.json lives (e.g., cwd or .web42/{agentName}/)
+  config: { username?: string; apiUrl?: string }
+  force?: boolean
+  forceAvatar?: boolean
+  spinner: ReturnType<typeof ora>
+  adapter: ReturnType<typeof resolvePlatform>
+  agentName?: string
+}): Promise<void> {
+  const { cwd, config, spinner, distDir, syncDir } = opts
+  let manifest = opts.manifest
 
-    if (!existsSync(manifestPath)) {
-      console.log(
-        chalk.red("No manifest.json found. Run `web42 init` first.")
-      )
-      process.exit(1)
+  // -----------------------------------------------------------------------
+  // Step 1: Pack into dist/ (if not already packed)
+  // -----------------------------------------------------------------------
+  if (existsSync(distDir)) {
+    const packedManifestPath = join(distDir, "manifest.json")
+    if (existsSync(packedManifestPath)) {
+      manifest = JSON.parse(readFileSync(packedManifestPath, "utf-8"))
     }
+  } else {
+    spinner.text = `Packing ${opts.agentName ?? "agent"}...`
+    const result = await opts.adapter.pack({
+      cwd,
+      outputDir: distDir.startsWith(cwd) ? distDir.slice(cwd.length + 1) : distDir,
+      agentName: opts.agentName,
+    })
 
-    let manifest = JSON.parse(readFileSync(manifestPath, "utf-8"))
-
-    if (!manifest.name || !manifest.version || !manifest.author) {
-      console.log(
-        chalk.red(
-          "Invalid manifest.json. Must have name, version, and author."
-        )
-      )
-      process.exit(1)
+    const internalPrefixes: string[] = []
+    for (const f of result.files) {
+      const skillMatch = f.path.match(/^skills\/([^/]+)\/SKILL\.md$/)
+      if (skillMatch) {
+        const parsed = parseSkillMd(f.content, skillMatch[1])
+        if (parsed.internal)
+          internalPrefixes.push(`skills/${skillMatch[1]}/`)
+      }
     }
-
-    const spinner = ora("Preparing agent package...").start()
-
-    // -----------------------------------------------------------------------
-    // Step 1: Pack into .web42/dist/
-    // -----------------------------------------------------------------------
-    const distDir = join(cwd, ".web42", "dist")
-
-    if (existsSync(distDir)) {
-      spinner.text = "Reading packed artifact from .web42/dist/..."
-      const packedManifestPath = join(distDir, "manifest.json")
-      if (existsSync(packedManifestPath)) {
-        manifest = JSON.parse(readFileSync(packedManifestPath, "utf-8"))
-      }
-    } else {
-      spinner.text = "Packing agent into .web42/dist/..."
-      const result = await openclawAdapter.pack({
-        cwd,
-        outputDir: ".web42/dist",
-      })
-
-      const internalPrefixes: string[] = []
-      for (const f of result.files) {
-        const skillMatch = f.path.match(/^skills\/([^/]+)\/SKILL\.md$/)
-        if (skillMatch) {
-          const parsed = parseSkillMd(f.content, skillMatch[1])
-          if (parsed.internal)
-            internalPrefixes.push(`skills/${skillMatch[1]}/`)
-        }
-      }
-      if (internalPrefixes.length > 0) {
-        result.files = result.files.filter(
-          (f) => !internalPrefixes.some((p) => f.path.startsWith(p))
-        )
-      }
-
-      const existingKeys = new Set(
-        (manifest.configVariables ?? []).map((v: { key: string }) => v.key)
-      )
-      for (const cv of result.configVariables) {
-        if (!existingKeys.has(cv.key)) {
-          if (!manifest.configVariables) manifest.configVariables = []
-          manifest.configVariables.push(cv)
-          existingKeys.add(cv.key)
-        }
-      }
-
-      mkdirSync(distDir, { recursive: true })
-      for (const file of result.files) {
-        const filePath = join(distDir, file.path)
-        mkdirSync(join(filePath, ".."), { recursive: true })
-        writeFileSync(filePath, file.content, "utf-8")
-      }
-      writeFileSync(
-        join(distDir, "manifest.json"),
-        JSON.stringify(manifest, null, 2) + "\n"
+    if (internalPrefixes.length > 0) {
+      result.files = result.files.filter(
+        (f) => !internalPrefixes.some((p) => f.path.startsWith(p))
       )
     }
 
-    // -----------------------------------------------------------------------
-    // Step 2: Resolve agent ID (create if first push)
-    // -----------------------------------------------------------------------
-    spinner.text = "Resolving agent..."
+    const configVars = Array.isArray(manifest.configVariables) ? manifest.configVariables : []
+    const existingKeys = new Set(
+      configVars.map((v: { key: string }) => v.key)
+    )
+    for (const cv of result.configVariables) {
+      if (!existingKeys.has(cv.key)) {
+        if (!manifest.configVariables) manifest.configVariables = []
+        ;(manifest.configVariables as Array<unknown>).push(cv)
+        existingKeys.add(cv.key)
+      }
+    }
 
-    let syncState = readSyncState(cwd)
-    let agentId = syncState?.agent_id ?? null
-    let isCreated = false
+    mkdirSync(distDir, { recursive: true })
+    for (const file of result.files) {
+      const filePath = join(distDir, file.path)
+      mkdirSync(join(filePath, ".."), { recursive: true })
+      writeFileSync(filePath, file.content, "utf-8")
+    }
+    writeFileSync(
+      join(distDir, "manifest.json"),
+      JSON.stringify(manifest, null, 2) + "\n"
+    )
+  }
 
+  // -----------------------------------------------------------------------
+  // Step 2: Resolve agent ID (create if first push)
+  // -----------------------------------------------------------------------
+  spinner.text = `Resolving ${opts.agentName ?? "agent"}...`
+
+  let syncState = readSyncState(syncDir)
+  let agentId = syncState?.agent_id ?? null
+  let isCreated = false
+
+  // Always resolve agent metadata (README, marketplace config, avatar)
+  // and upsert the agent record so metadata updates propagate on every push.
+  {
+    let readme = ""
+    // Check per-agent README first (syncDir/README.md), then cwd/README.md
+    const agentReadmePath = join(syncDir, "README.md")
+    const cwdReadmePath = join(cwd, "README.md")
+    if (existsSync(agentReadmePath)) {
+      readme = readFileSync(agentReadmePath, "utf-8")
+    } else if (existsSync(cwdReadmePath)) {
+      readme = readFileSync(cwdReadmePath, "utf-8")
+    }
+
+    // Note: visibility, license, price, and tags are managed exclusively
+    // through the dashboard UI — the CLI never sends these fields.
+
+    let profile_image_data = undefined
     if (!agentId) {
-      let readme = ""
-      const readmePath = join(cwd, "README.md")
-      if (existsSync(readmePath)) {
-        readme = readFileSync(readmePath, "utf-8")
-      }
-
-      let profile_image_data = undefined
-      // Check for avatar/avatar.png or avatars/avatar.png
+      // Only upload avatar on first push (subsequent avatar updates use step 6)
       const avatarSearchPaths = [
         join(cwd, "avatar/avatar.png"),
         join(cwd, "avatars/avatar.png"),
         join(cwd, "avatar.png"),
-        // Also check .web42/ for the one managed by build/pack
-        join(cwd, ".web42/avatar.png"),
+        join(syncDir, "avatar.png"),
       ]
 
       for (const ap of avatarSearchPaths) {
@@ -157,155 +155,282 @@ export const pushCommand = new Command("push")
               profile_image_data = readFileSync(ap).toString("base64")
               break
             }
-          } catch (e) {
+          } catch {
             // Skip
           }
         }
       }
-
-      const agentResult = await apiPost<{
-        agent: { id: string }
-        created?: boolean
-        hash?: string
-      }>("/api/agents", {
-        slug: manifest.name,
-        name: manifest.name,
-        description: manifest.description ?? "",
-        readme,
-        manifest,
-        demo_video_url: manifest.demoVideoUrl,
-        profile_image_data,
-      })
-
-      agentId = agentResult.agent.id
-      isCreated = !!agentResult.created
     }
 
-    // -----------------------------------------------------------------------
-    // Step 3: Build local snapshot and compute hash
-    // -----------------------------------------------------------------------
-    spinner.text = "Building snapshot..."
-    const snapshot = buildLocalSnapshot(cwd)
+    const name = (manifest.name as string) ?? ""
+    const agentResult = await apiPost<{
+      agent: { id: string }
+      created?: boolean
+      hash?: string
+    }>("/api/agents", {
+      slug: name,
+      name,
+      description: (manifest.description as string) ?? "",
+      readme,
+      manifest,
+      demo_video_url: (manifest as Record<string, unknown>).demoVideoUrl,
+      profile_image_data,
+    })
 
-    const localHash = computeHashFromSnapshot(snapshot)
+    agentId = agentResult.agent.id
+    isCreated = !!agentResult.created
+  }
 
-    // -----------------------------------------------------------------------
-    // Step 4: Compare local hash with last known local hash (unless --force)
-    // -----------------------------------------------------------------------
-    if (!opts.force && !opts.forceAvatar && !isCreated && syncState?.last_local_hash) {
-      if (localHash === syncState.last_local_hash) {
-        spinner.succeed(
-          `${chalk.bold(`@${config.username}/${manifest.name}`)} has no local changes since last sync.`
-        )
-        return
-      }
-    }
+  // -----------------------------------------------------------------------
+  // Step 3: Build local snapshot and compute hash
+  // -----------------------------------------------------------------------
+  spinner.text = "Building snapshot..."
+  const snapshot = buildLocalSnapshot(syncDir.includes(".web42") ? syncDir : cwd, distDir)
 
-    // -----------------------------------------------------------------------
-    // Step 5: Push snapshot
-    // -----------------------------------------------------------------------
-    spinner.text = `Pushing ${snapshot.files.length} files...`
+  const localHash = computeHashFromSnapshot(snapshot)
 
-    try {
-      const pushResult = await apiPost<SyncPushResponse>(
-        `/api/agents/${agentId}/sync/push`,
-        snapshot
+  // -----------------------------------------------------------------------
+  // Step 4: Compare hashes (unless --force)
+  // -----------------------------------------------------------------------
+  const name = (manifest.name as string) ?? ""
+  if (!opts.force && !opts.forceAvatar && !isCreated && syncState?.last_local_hash) {
+    if (localHash === syncState.last_local_hash) {
+      spinner.succeed(
+        `${chalk.bold(`@${config.username}/${name}`)} has no local changes since last sync.`
       )
+      return
+    }
+  }
 
-      let finalHash = pushResult.hash
+  // -----------------------------------------------------------------------
+  // Step 5: Push snapshot
+  // -----------------------------------------------------------------------
+  spinner.text = `Pushing ${snapshot.files.length} files...`
 
-      // -------------------------------------------------------------------
-      // Step 6: Upload avatar if present
-      // -------------------------------------------------------------------
-      const avatarPath = findLocalAvatar(cwd) || findAgentAvatar(cwd)
-      if (avatarPath) {
-        spinner.text = "Uploading avatar..."
-        const ext = avatarPath.split(".").pop() ?? "png"
-        const avatarBuffer = readFileSync(avatarPath)
-        const avatarBlob = new Blob([avatarBuffer], {
+  const pushResult = await apiPost<SyncPushResponse>(
+    `/api/agents/${agentId}/sync/push`,
+    snapshot
+  )
+
+  let finalHash = pushResult.hash
+
+  // -----------------------------------------------------------------------
+  // Step 6: Upload avatar if present
+  // -----------------------------------------------------------------------
+  const avatarPath = findLocalAvatar(syncDir) || findAgentAvatar(cwd)
+  if (avatarPath) {
+    spinner.text = "Uploading avatar..."
+    const ext = avatarPath.split(".").pop() ?? "png"
+    const avatarBuffer = readFileSync(avatarPath)
+    const avatarBlob = new Blob([avatarBuffer], {
+      type: mimeFromExtension(ext),
+    })
+    const avatarForm = new FormData()
+    avatarForm.append("avatar", avatarBlob, `avatar.${ext}`)
+
+    const avatarResult = await apiFormData<AvatarUploadResponse>(
+      `/api/agents/${agentId}/sync/avatar`,
+      avatarForm
+    )
+    finalHash = avatarResult.hash
+  }
+
+  // -----------------------------------------------------------------------
+  // Step 7: Upload resources if present
+  // -----------------------------------------------------------------------
+  const resourcesMeta = readResourcesMeta(syncDir)
+  const discoveredResources = discoverResources(cwd)
+  const allResources = [...resourcesMeta, ...discoveredResources]
+
+  if (allResources.length > 0) {
+    spinner.text = "Uploading resources..."
+    const resForm = new FormData()
+
+    const metadataForApi = allResources.map((meta, i) => ({
+      file_key: `resource_${i}`,
+      title: meta.title,
+      description: meta.description,
+      type: meta.type,
+      sort_order: meta.sort_order,
+    }))
+    resForm.append("metadata", JSON.stringify(metadataForApi))
+
+    for (let i = 0; i < allResources.length; i++) {
+      const meta = allResources[i]
+      let resFilePath = join(syncDir, "resources", meta.file)
+      if (!existsSync(resFilePath)) {
+        resFilePath = join(cwd, ".web42", "resources", meta.file)
+      }
+      if (!existsSync(resFilePath)) {
+        resFilePath = join(cwd, "resources", meta.file)
+      }
+
+      if (existsSync(resFilePath)) {
+        const resBuffer = readFileSync(resFilePath)
+        const ext = meta.file.split(".").pop() ?? ""
+        const blob = new Blob([resBuffer], {
           type: mimeFromExtension(ext),
         })
-        const avatarForm = new FormData()
-        avatarForm.append("avatar", avatarBlob, `avatar.${ext}`)
-
-        const avatarResult = await apiFormData<AvatarUploadResponse>(
-          `/api/agents/${agentId}/sync/avatar`,
-          avatarForm
-        )
-        finalHash = avatarResult.hash
+        resForm.append(`resource_${i}`, blob, meta.file)
       }
+    }
 
-      // -------------------------------------------------------------------
-      // Step 7: Upload resources if present
-      // -------------------------------------------------------------------
-      const resourcesMeta = readResourcesMeta(cwd);
-      const discoveredResources = discoverResources(cwd);
-      const allResources = [...resourcesMeta, ...discoveredResources];
+    const resResult = await apiFormData<ResourcesUploadResponse>(
+      `/api/agents/${agentId}/sync/resources`,
+      resForm
+    )
+    finalHash = resResult.hash
+  }
 
-      if (allResources.length > 0) {
-        spinner.text = "Uploading resources...";
-        const resForm = new FormData();
+  // -----------------------------------------------------------------------
+  // Step 8: Save sync state
+  // -----------------------------------------------------------------------
+  writeSyncState(syncDir, {
+    agent_id: agentId,
+    last_remote_hash: finalHash,
+    last_local_hash: localHash,
+    synced_at: new Date().toISOString(),
+  })
 
-        const metadataForApi = allResources.map((meta, i) => ({
-          file_key: `resource_${i}`,
-          title: meta.title,
-          description: meta.description,
-          type: meta.type,
-          sort_order: meta.sort_order,
-        }));
-        resForm.append("metadata", JSON.stringify(metadataForApi));
+  const siteUrl = config.apiUrl ? config.apiUrl.replace("https://", "") : "web42.ai"
 
-        for (let i = 0; i < allResources.length; i++) {
-          const meta = allResources[i];
-          // Try .web42/resources/ first (legacy/tracked), then root resources/
-          let resFilePath = join(cwd, ".web42", "resources", meta.file);
-          if (!existsSync(resFilePath)) {
-            resFilePath = join(cwd, "resources", meta.file);
-          }
+  if (isCreated) {
+    console.log(chalk.green(`  New agent created: @${config.username}/${name}`))
+  } else {
+    console.log(chalk.green(`  Updated: @${config.username}/${name}`))
+  }
+  console.log(chalk.dim(`  View at: ${siteUrl}/${config.username}/${name}`))
+  console.log(chalk.dim(`  Sync hash: ${finalHash.slice(0, 12)}...`))
+}
 
-          if (existsSync(resFilePath)) {
-            const resBuffer = readFileSync(resFilePath);
-            const ext = meta.file.split(".").pop() ?? "";
-            const blob = new Blob([resBuffer], {
-              type: mimeFromExtension(ext),
-            });
-            resForm.append(`resource_${i}`, blob, meta.file);
+// ---------------------------------------------------------------------------
+// Command
+// ---------------------------------------------------------------------------
+
+export const pushCommand = new Command("push")
+  .description("Push your agent package to the Web42 marketplace")
+  .option("--force", "Skip hash comparison and always push")
+  .option("--force-avatar", "Explicitly upload avatar even if no other changes")
+  .option("--agent <name>", "Push a specific agent (for multi-agent workspaces)")
+  .action(async (opts: { force?: boolean; forceAvatar?: boolean; agent?: string }) => {
+    const config = requireAuth()
+    const cwd = process.cwd()
+
+    // Detect multi-agent workspace (per-agent manifests in .web42/{name}/)
+    const web42Dir = join(cwd, ".web42")
+    const agentManifests = new Map<string, Record<string, unknown>>()
+    let platform = "openclaw"
+
+    if (existsSync(web42Dir)) {
+      try {
+        const entries = readdirSync(web42Dir, { withFileTypes: true })
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue
+          const agentManifestPath = join(web42Dir, entry.name, "manifest.json")
+          if (existsSync(agentManifestPath)) {
+            try {
+              const m = JSON.parse(readFileSync(agentManifestPath, "utf-8"))
+              agentManifests.set(entry.name, m)
+              if (m.platform) platform = m.platform
+            } catch {
+              // skip
+            }
           }
         }
+      } catch {
+        // .web42 not readable
+      }
+    }
 
-        const resResult = await apiFormData<ResourcesUploadResponse>(
-          `/api/agents/${agentId}/sync/resources`,
-          resForm
-        );
-        finalHash = resResult.hash;
+    const isMultiAgent = agentManifests.size > 0
+
+    // Single-agent mode (e.g., OpenClaw)
+    if (!isMultiAgent) {
+      const manifestPath = join(cwd, "manifest.json")
+      if (!existsSync(manifestPath)) {
+        console.log(chalk.red("No manifest.json found. Run `web42 init` first."))
+        process.exit(1)
       }
 
-      // -------------------------------------------------------------------
-      // Step 8: Save sync state
-      // -------------------------------------------------------------------
-      writeSyncState(cwd, {
-        agent_id: agentId,
-        last_remote_hash: finalHash,
-        last_local_hash: localHash,
-        synced_at: new Date().toISOString(),
-      })
-
-      spinner.succeed(
-        `Pushed ${chalk.bold(`@${config.username}/${manifest.name}`)} (${snapshot.files.length} files)`
-      )
-
-      if (isCreated) {
-        console.log(chalk.green("  New agent created!"))
-      } else {
-        console.log(chalk.green("  Agent updated."))
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"))
+      if (!manifest.name || !manifest.version || !manifest.author) {
+        console.log(chalk.red("Invalid manifest.json. Must have name, version, and author."))
+        process.exit(1)
       }
 
-      console.log(
-        chalk.dim(
-          `  View at: ${config.apiUrl ? config.apiUrl.replace("https://", "") : "web42.ai"}/${config.username}/${manifest.name}`
+      if (manifest.platform) platform = manifest.platform
+      const adapter = resolvePlatform(platform)
+      const spinner = ora("Preparing agent package...").start()
+
+      try {
+        await pushSingleAgent({
+          cwd,
+          manifest,
+          distDir: join(cwd, ".web42", "dist"),
+          syncDir: cwd,
+          config,
+          force: opts.force,
+          forceAvatar: opts.forceAvatar,
+          spinner,
+          adapter,
+        })
+
+        spinner.succeed(
+          `Pushed ${chalk.bold(`@${config.username}/${manifest.name}`)}`
         )
-      )
-      console.log(chalk.dim(`  Sync hash: ${finalHash.slice(0, 12)}...`))
+      } catch (error: any) {
+        spinner.fail("Push failed")
+        console.error(chalk.red(error.message))
+        process.exit(1)
+      }
+      return
+    }
+
+    // Multi-agent mode
+    const adapter = resolvePlatform(platform)
+
+    let agentsToPush: Array<[string, Record<string, unknown>]>
+    if (opts.agent) {
+      const manifest = agentManifests.get(opts.agent)
+      if (!manifest) {
+        console.log(
+          chalk.red(
+            `Agent "${opts.agent}" not found. Available: ${[...agentManifests.keys()].join(", ")}`
+          )
+        )
+        process.exit(1)
+      }
+      agentsToPush = [[opts.agent, manifest]]
+    } else {
+      agentsToPush = [...agentManifests.entries()]
+    }
+
+    const spinner = ora(`Pushing ${agentsToPush.length} agent(s)...`).start()
+
+    try {
+      let successCount = 0
+      for (const [agentName, manifest] of agentsToPush) {
+        spinner.text = `Pushing ${agentName}...`
+
+        const agentWeb42Dir = join(web42Dir, agentName)
+        const distDir = join(agentWeb42Dir, "dist")
+
+        await pushSingleAgent({
+          cwd,
+          manifest,
+          distDir,
+          syncDir: agentWeb42Dir,
+          config,
+          force: opts.force,
+          forceAvatar: opts.forceAvatar,
+          spinner,
+          adapter,
+          agentName,
+        })
+        successCount++
+      }
+
+      spinner.succeed(`Pushed ${successCount} agent(s)`)
     } catch (error: any) {
       spinner.fail("Push failed")
       console.error(chalk.red(error.message))

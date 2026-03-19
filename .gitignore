@@ -44,3 +44,12 @@ next-env.d.ts
 
 __data__
 **/stage-1-crawl/storage
+
+# web42 CLI build artifacts & sync state
+.web42/
+
+# Claude Code local settings & worktrees
+.claude/settings.local.json
+.claude/worktrees/
+.claude/agent-memory/
+.claude/agent-memory-local/

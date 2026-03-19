@@ -10,6 +10,7 @@ export interface PackOptions {
   cwd: string
   outputDir: string
   dryRun?: boolean
+  agentName?: string // For multi-agent workspaces (e.g., Claude)
 }
 
 export interface PackedFile {
@@ -41,6 +42,7 @@ export interface InstallResult {
 
 export interface UninstallOptions {
   agentName: string
+  workspacePath?: string
 }
 
 export interface UninstallResult {
@@ -59,6 +61,20 @@ export interface InitConfig {
   model?: string
 }
 
+export interface AgentCandidate {
+  name: string
+  description?: string
+  model?: string
+  skills: string[]
+  path: string
+}
+
+export interface ResolvedSkill {
+  name: string
+  sourcePath: string
+  found: boolean
+}
+
 export interface PlatformAdapter {
   name: string
   home: string
@@ -68,4 +84,9 @@ export interface PlatformAdapter {
   install(options: InstallOptions): Promise<InstallResult>
   uninstall(options: UninstallOptions): Promise<UninstallResult>
   listInstalled(): Promise<InstalledAgent[]>
+
+  // Optional: multi-agent support (Claude)
+  discoverAgents?(cwd: string): AgentCandidate[]
+  resolveSkills?(skillNames: string[], cwd: string): ResolvedSkill[]
+  resolveInstallPath?(localName: string, global?: boolean): string
 }

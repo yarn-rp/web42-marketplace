@@ -13,27 +13,59 @@ export async function GET(request: Request) {
   const search = url.searchParams.get("search")
   const username = url.searchParams.get("username")
 
-  let query = db
+  // Check if requester is authenticated (optional — unauthenticated requests still work)
+  const auth = await authenticateRequest(request).catch(() => null)
+
+  // When the owner requests their own agents, use the admin client to bypass
+  // RLS (which filters out private/unlisted agents at the DB level).
+  let isOwnerRequest = false
+  if (username && auth) {
+    const { data: targetUser } = await db
+      .from("users")
+      .select("id")
+      .eq("username", username)
+      .single()
+
+    if (targetUser && targetUser.id === auth.userId) {
+      isOwnerRequest = true
+    }
+  }
+
+  const queryClient = isOwnerRequest
+    ? createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+    : db
+
+  let query = queryClient
     .from("agents")
     .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
-    .eq("visibility", "public")
+
+  if (username) {
+    const { data: targetUser } = await queryClient
+      .from("users")
+      .select("id")
+      .eq("username", username)
+      .single()
+
+    if (targetUser) {
+      query = query.eq("owner_id", targetUser.id)
+      // Non-owner requests: only show public
+      if (!isOwnerRequest) {
+        query = query.eq("visibility", "public")
+      }
+    }
+  } else {
+    // No username filter — only public
+    query = query.eq("visibility", "public")
+  }
 
   if (search) {
     query = query.textSearch("search_vector", search, {
       type: "websearch",
       config: "english",
     })
-  }
-
-  if (username) {
-    const { data: user } = await db
-      .from("users")
-      .select("id")
-      .eq("username", username)
-      .single()
-    if (user) {
-      query = query.eq("owner_id", user.id)
-    }
   }
 
   query = query.order("stars_count", { ascending: false })
@@ -89,6 +121,7 @@ export async function POST(request: Request) {
     manifest.platform = "openclaw"
   }
 
+  // Fields that the CLI can always update
   const agentFields: Record<string, unknown> = {
     name,
     description: description ?? "",
@@ -98,10 +131,13 @@ export async function POST(request: Request) {
     demo_video_url,
   }
 
-  if (price_cents !== undefined) agentFields.price_cents = price_cents
-  if (currency !== undefined) agentFields.currency = currency
-  if (license !== undefined) agentFields.license = license
-  if (visibility !== undefined) agentFields.visibility = visibility
+  // Marketplace-sensitive fields (price, currency, license, visibility)
+  // are ONLY set on create. Updates to these must go through the dashboard UI.
+  const createOnlyFields: Record<string, unknown> = {}
+  if (price_cents !== undefined) createOnlyFields.price_cents = price_cents
+  if (currency !== undefined) createOnlyFields.currency = currency
+  if (license !== undefined) createOnlyFields.license = license
+  if (visibility !== undefined) createOnlyFields.visibility = visibility
 
   if (profile_image_data) {
     try {
@@ -164,6 +200,7 @@ export async function POST(request: Request) {
         owner_id: userId,
         visibility: "private",
         ...agentFields,
+        ...createOnlyFields,
       })
       .select()
       .single()
