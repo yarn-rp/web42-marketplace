@@ -16,15 +16,26 @@ export async function GET(request: Request) {
   // Check if requester is authenticated (optional — unauthenticated requests still work)
   const auth = await authenticateRequest(request).catch(() => null)
 
+  let isOwnerRequest = false
+  let targetUser: { id: string } | null = null
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn("SUPABASE_SERVICE_ROLE_KEY not set — falling back to public client")
+    isOwnerRequest = false
+  }
+
   // When the owner requests their own agents, use the admin client to bypass
   // RLS (which filters out private/unlisted agents at the DB level).
-  let isOwnerRequest = false
+
   if (username && auth) {
-    const { data: targetUser } = await db
+    // Fetch once only
+    const result = await db
       .from("users")
       .select("id")
       .eq("username", username)
       .single()
+
+    targetUser = result.data
 
     if (targetUser && targetUser.id === auth.userId) {
       isOwnerRequest = true
@@ -43,12 +54,6 @@ export async function GET(request: Request) {
     .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
 
   if (username) {
-    const { data: targetUser } = await queryClient
-      .from("users")
-      .select("id")
-      .eq("username", username)
-      .single()
-
     if (targetUser) {
       query = query.eq("owner_id", targetUser.id)
       // Non-owner requests: only show public
@@ -60,6 +65,7 @@ export async function GET(request: Request) {
     // No username filter — only public
     query = query.eq("visibility", "public")
   }
+
 
   if (search) {
     query = query.textSearch("search_vector", search, {
