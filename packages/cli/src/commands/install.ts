@@ -14,6 +14,7 @@ interface MarketplaceInstallResult {
     slug: string
     name: string
     manifest: {
+      version?: string
       configVariables?: Array<{
         key: string
         label: string
@@ -245,6 +246,7 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
           files: result.files,
           configTemplate,
           configAnswers,
+          version: result.agent.manifest.version as string | undefined,
         })
 
         const web42Config = {

@@ -17,6 +17,9 @@ describe("ClaudeAdapter", () => {
   beforeEach(() => {
     adapter = new ClaudeAdapter()
     tempDir = createTempDir()
+    // Override home so discoverAgents/resolveSkills don't pick up the real
+    // ~/.claude directory during tests, making results fully deterministic.
+    adapter.home = tempDir
   })
 
   afterEach(() => {
