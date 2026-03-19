@@ -42,7 +42,7 @@ export const metadata = {
   keywords:
     "AI Agents, Agent Marketplace, CLI, Web42, OpenClaw, Install Agents, Publish Agents",
   icons: {
-    icon: "/icon.svg",
+    icon: "/icon.png",
     apple: "/apple-icon.png",
   },
   openGraph: {
