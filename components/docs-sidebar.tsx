@@ -19,6 +19,7 @@ const docsNavItems: NavItem[] = [
   { href: "/docs/monetization", label: "Monetization" },
   { href: "/docs/platforms", label: "Platforms" },
   { href: "/docs/platforms/openclaw", label: "OpenClaw", indent: true },
+  { href: "/docs/platforms/claude", label: "Claude Code", indent: true },
   { href: "/docs/faq", label: "FAQ" },
 ]
 
