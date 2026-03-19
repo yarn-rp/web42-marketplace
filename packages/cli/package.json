@@ -1,6 +1,6 @@
 {
   "name": "@web42/cli",
-  "version": "0.1.17",
+  "version": "0.2.0",
   "description": "CLI for the Web42 Agent Marketplace - push, install, and remix OpenClaw agent packages",
   "type": "module",
   "bin": {
@@ -26,7 +26,8 @@
   "devDependencies": {
     "@types/inquirer": "^9.0.9",
     "@types/node": "^20.11.5",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.0"
   },
   "engines": {
     "node": ">=18"

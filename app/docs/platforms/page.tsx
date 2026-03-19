@@ -37,21 +37,38 @@ export default function DocsPlatformsPage() {
 
       <section>
         <h2 className="mb-4 text-xl font-semibold">Active platforms</h2>
-        <Link
-          href="/docs/platforms/openclaw"
-          className="block rounded-lg border p-6 transition-colors hover:border-foreground/20"
-        >
-          <h3 className="mb-2 text-lg font-medium">OpenClaw</h3>
-          <p className="mb-4 text-muted-foreground">
-            Personal AI agents with persistent identity, memory across sessions,
-            skills as capabilities, and multi-channel presence (web chat,
-            Discord, WhatsApp, Telegram). OpenClaw agents are opinionated — they
-            have their own personality, preferences, and behavioral boundaries.
-          </p>
-          <span className="text-sm font-medium text-primary">
-            Read the guide →
-          </span>
-        </Link>
+        <div className="flex flex-col gap-4">
+          <Link
+            href="/docs/platforms/openclaw"
+            className="block rounded-lg border p-6 transition-colors hover:border-foreground/20"
+          >
+            <h3 className="mb-2 text-lg font-medium">OpenClaw</h3>
+            <p className="mb-4 text-muted-foreground">
+              Personal AI agents with persistent identity, memory across sessions,
+              skills as capabilities, and multi-channel presence (web chat,
+              Discord, WhatsApp, Telegram). OpenClaw agents are opinionated — they
+              have their own personality, preferences, and behavioral boundaries.
+            </p>
+            <span className="text-sm font-medium text-primary">
+              Read the guide →
+            </span>
+          </Link>
+          <Link
+            href="/docs/platforms/claude"
+            className="block rounded-lg border p-6 transition-colors hover:border-foreground/20"
+          >
+            <h3 className="mb-2 text-lg font-medium">Claude Code</h3>
+            <p className="mb-4 text-muted-foreground">
+              Anthropic&apos;s coding agent. Publish and install agents that
+              extend Claude Code with specialized skills, commands, and custom
+              personas. Supports local install (project-scoped) and global
+              install (available in all Claude Code sessions).
+            </p>
+            <span className="text-sm font-medium text-primary">
+              Read the guide →
+            </span>
+          </Link>
+        </div>
       </section>
 
       <section>
@@ -59,24 +76,15 @@ export default function DocsPlatformsPage() {
         <p className="mb-4 text-muted-foreground">
           Agents for these platforms will follow the same publish workflow (
           <code className="text-foreground">web42 init</code> →{" "}
-          <code className="text-foreground">web42 push</code>) but each will
-          have its own platform adapter with tailored install commands (e.g.{" "}
-          <code className="text-foreground">web42 opencode install</code>,{" "}
-          <code className="text-foreground">web42 claude install</code>).
+          <code className="text-foreground">web42 push</code>) with
+          platform-specific install adapters.
         </p>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border p-6 opacity-60">
             <h3 className="mb-2 text-lg font-medium">OpenCode</h3>
             <p className="text-sm text-muted-foreground">
               AI-powered coding assistant. Build agents that help developers
               write, review, and refactor code.
-            </p>
-          </div>
-          <div className="rounded-lg border p-6 opacity-60">
-            <h3 className="mb-2 text-lg font-medium">Claude Code</h3>
-            <p className="text-sm text-muted-foreground">
-              Anthropic&apos;s coding agent. Create specialized agents that
-              leverage Claude for software engineering tasks.
             </p>
           </div>
           <div className="rounded-lg border p-6 opacity-60">

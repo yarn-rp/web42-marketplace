@@ -39,7 +39,6 @@ const PLATFORMS = new Map<string, Platform>([
       name: "Claude",
       url: "https://claude.ai",
       logo: "/assets/platforms/claude.svg",
-      comingSoon: true,
       installCommand: (username, slug) =>
         `web42 claude install @${username}/${slug}`,
     },

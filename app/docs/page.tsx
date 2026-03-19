@@ -32,8 +32,15 @@ export default function DocsOverviewPage() {
             className="font-medium text-foreground underline underline-offset-4"
           >
             OpenClaw
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="/docs/platforms/claude"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Claude Code
           </Link>
-          , with OpenCode, Claude Code, and Codex coming soon.
+          , with OpenCode and Codex coming soon.
         </p>
       </section>
 

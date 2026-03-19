@@ -14,6 +14,7 @@ interface MarketplaceInstallResult {
     slug: string
     name: string
     manifest: {
+      version?: string
       configVariables?: Array<{
         key: string
         label: string
@@ -76,7 +77,8 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
     .argument("<agent>", "Agent to install (e.g. @user/agent-name)")
     .option("--as <name>", "Install under a different local agent name")
     .option("--no-prompt", "Skip config variable prompts, use defaults")
-    .action(async (agentRef: string, opts: { as?: string; prompt?: boolean }) => {
+    .option("-g, --global", "Install globally to ~/.claude/ instead of project-local .claude/")
+    .action(async (agentRef: string, opts: { as?: string; prompt?: boolean; global?: boolean }) => {
       const match = agentRef.match(/^@?([^/]+)\/(.+)$/)
       if (!match) {
         console.log(
@@ -231,7 +233,11 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
         }
 
         const localName = opts.as ?? agentSlug
-        const workspacePath = join(adapter.home, `workspace-${localName}`)
+        const workspacePath = adapter.resolveInstallPath
+          ? adapter.resolveInstallPath(localName, opts.global)
+          : opts.global
+            ? join(adapter.home, `workspace-${localName}`)
+            : join(process.cwd(), ".claude")
 
         const installResult = await adapter.install({
           agentSlug: localName,
@@ -240,6 +246,7 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
           files: result.files,
           configTemplate,
           configAnswers,
+          version: result.agent.manifest.version as string | undefined,
         })
 
         const web42Config = {
@@ -278,7 +285,10 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
         )
         console.log(chalk.dim(`  Workspace: ${workspacePath}`))
         if (manifest.skills && manifest.skills.length > 0) {
-          console.log(chalk.dim(`  Skills: ${manifest.skills.join(", ")}`))
+          const skillNames = manifest.skills.map((s: any) =>
+            typeof s === "string" ? s : s.name
+          )
+          console.log(chalk.dim(`  Skills: ${skillNames.join(", ")}`))
         }
         console.log(chalk.dim(`  ${installResult.filesWritten} files written`))
 
@@ -298,11 +308,19 @@ export function makeInstallCommand(adapter: PlatformAdapter): Command {
         }
 
         console.log()
-        console.log(chalk.dim("  Next steps:"))
-        console.log(chalk.dim(`    1. Set up channel bindings:  ${adapter.name} config`))
-        console.log(
-          chalk.dim(`    2. Restart the gateway:      ${adapter.name} gateway restart`)
-        )
+        if (adapter.name === "claude") {
+          if (opts.global) {
+            console.log(chalk.dim("  Next: Open Claude Code — the agent is available globally."))
+          } else {
+            console.log(chalk.dim("  Next: Open Claude Code in this project — the agent is available locally."))
+          }
+        } else {
+          console.log(chalk.dim("  Next steps:"))
+          console.log(chalk.dim(`    1. Set up channel bindings:  ${adapter.name} config`))
+          console.log(
+            chalk.dim(`    2. Restart the gateway:      ${adapter.name} gateway restart`)
+          )
+        }
       } catch (error: any) {
         spinner.fail("Install failed")
         console.error(chalk.red(error.message))

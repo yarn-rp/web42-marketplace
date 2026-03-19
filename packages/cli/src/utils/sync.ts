@@ -261,7 +261,7 @@ function readPackedFiles(
 // Build a full AgentSnapshot from local workspace
 // ---------------------------------------------------------------------------
 
-export function buildLocalSnapshot(cwd: string): AgentSnapshot {
+export function buildLocalSnapshot(cwd: string, overrideDistDir?: string): AgentSnapshot {
   const manifestPath = join(cwd, "manifest.json")
   const manifest: Record<string, unknown> = existsSync(manifestPath)
     ? JSON.parse(readFileSync(manifestPath, "utf-8"))
@@ -281,7 +281,7 @@ export function buildLocalSnapshot(cwd: string): AgentSnapshot {
   const avatarPath = findLocalAvatar(cwd)
   const syncState = readSyncState(cwd)
 
-  const distDir = join(cwd, ".web42", "dist")
+  const distDir = overrideDistDir ?? join(cwd, ".web42", "dist")
   const files = readPackedFiles(distDir)
 
   return {
