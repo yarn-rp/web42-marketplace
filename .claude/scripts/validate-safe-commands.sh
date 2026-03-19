@@ -10,8 +10,8 @@ if [ -z "$COMMAND" ]; then
 fi
 
 # Block destructive file operations
-if echo "$COMMAND" | grep -iE 'rm\s+-rf\s+/' > /dev/null; then
-  echo "Blocked: Cannot rm -rf root paths" >&2
+if echo "$COMMAND" | grep -iE 'rm\s+-rf\s+/(|\.|~|\\$HOME|\*)' > /dev/null; then
+  echo "Blocked: Cannot rm -rf root or home paths" >&2
   exit 2
 fi
 
