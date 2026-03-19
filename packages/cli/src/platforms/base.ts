@@ -33,6 +33,7 @@ export interface InstallOptions {
   files: Array<{ path: string; content: string | null; content_hash: string }>
   configTemplate: Record<string, unknown> | null
   configAnswers: Record<string, string>
+  version?: string
 }
 
 export interface InstallResult {

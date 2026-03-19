@@ -227,8 +227,9 @@ export class ClaudeAdapter implements PlatformAdapter {
     }
 
     // 3. ~/.claude/agents/ (global, if cwd isn't already ~/.claude/)
-    const globalAgentsDir = join(CLAUDE_HOME, "agents")
-    if (resolve(cwd) !== resolve(CLAUDE_HOME) && existsSync(globalAgentsDir)) {
+    // Use `this.home` so tests can override the home dir for isolation.
+    const globalAgentsDir = join(this.home, "agents")
+    if (resolve(cwd) !== resolve(this.home) && existsSync(globalAgentsDir)) {
       searchDirs.push(globalAgentsDir)
     }
 
@@ -425,34 +426,64 @@ export class ClaudeAdapter implements PlatformAdapter {
       }
     }
 
-    // 4. Add scripts/** if present (check cwd/scripts/ and cwd/.claude/scripts/)
+    // 4. Add scripts/** if present (check BOTH cwd/scripts/ and cwd/.claude/scripts/)
     const scriptsDir = join(cwd, "scripts")
     const claudeScriptsDir = join(cwd, ".claude", "scripts")
-    const effectiveScriptsDir = existsSync(scriptsDir) ? scriptsDir : claudeScriptsDir
-    if (existsSync(effectiveScriptsDir)) {
+
+    const allScriptFiles = new Map<string, string>() // filePath -> content
+
+    if (existsSync(scriptsDir)) {
       const scriptFiles = await glob("**/*", {
-        cwd: effectiveScriptsDir,
+        cwd: scriptsDir,
         nodir: true,
         ignore: ignorePatterns,
         dot: true,
       })
       for (const filePath of scriptFiles) {
-        const fullPath = join(effectiveScriptsDir, filePath)
-        const stat = statSync(fullPath)
-        if (stat.size > 1024 * 1024) continue
-
         try {
+          const fullPath = join(scriptsDir, filePath)
+          const stat = statSync(fullPath)
+          if (stat.size > 1024 * 1024) continue
           let content = readFileSync(fullPath, "utf-8")
           content = sanitizeContent(content)
-          files.push({
-            path: `scripts/${filePath}`,
-            content,
-            hash: hashContent(content),
-          })
+          if (!allScriptFiles.has(filePath)) {
+            allScriptFiles.set(filePath, content)
+          }
         } catch {
-          // Skip binary files
+          // Skip
         }
       }
+    }
+
+    if (existsSync(claudeScriptsDir)) {
+      const claudeScriptFiles = await glob("**/*", {
+        cwd: claudeScriptsDir,
+        nodir: true,
+        ignore: ignorePatterns,
+        dot: true,
+      })
+      for (const filePath of claudeScriptFiles) {
+        try {
+          const fullPath = join(claudeScriptsDir, filePath)
+          const stat = statSync(fullPath)
+          if (stat.size > 1024 * 1024) continue
+          let content = readFileSync(fullPath, "utf-8")
+          content = sanitizeContent(content)
+          if (!allScriptFiles.has(filePath)) {
+            allScriptFiles.set(filePath, content)
+          }
+        } catch {
+          // Skip
+        }
+      }
+    }
+
+    for (const [filePath, content] of allScriptFiles.entries()) {
+      files.push({
+        path: `scripts/${filePath}`,
+        content,
+        hash: hashContent(content),
+      })
     }
 
     // Detect config variables from {{VAR}} patterns in agent .md
@@ -501,7 +532,7 @@ export class ClaudeAdapter implements PlatformAdapter {
       const targetPath = join(targetRoot, file.path)
       if (existsSync(targetPath)) {
         const tracker = isFileTracked(file.path, installed)
-        if (!tracker && tracker !== agentSlug) {
+        if (!tracker || tracker !== agentSlug) {
           console.warn(`  Warning: Overwriting existing file: ${file.path}`)
         }
       }
@@ -534,7 +565,7 @@ export class ClaudeAdapter implements PlatformAdapter {
       ...readInstalledManifest(targetRoot),
       [agentSlug]: {
         source: `@${options.username}/${agentSlug}`,
-        version: "1.0.0",
+        version: options.version ?? "1.0.0",
         installed_at: new Date().toISOString(),
         files: trackedFiles,
       },
