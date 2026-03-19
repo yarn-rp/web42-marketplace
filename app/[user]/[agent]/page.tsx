@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import type { Metadata } from "next"
 
 import { AgentShowcase } from "@/components/agent-showcase"
 import { FadeIn } from "@/components/cult/fade-in"
@@ -11,6 +12,45 @@ import {
 import { getOrderForAgent, verifyAndFulfillCheckout } from "@/app/actions/stripe"
 import { getCachedTags } from "@/app/actions/filters"
 import { getCurrentProfile } from "@/app/actions/profile"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ user: string; agent: string }>
+}): Promise<Metadata> {
+  const { user: username, agent: agentSlug } = await params
+  const agent = await getAgentBySlug(username, agentSlug)
+
+  if (!agent) {
+    return { title: "Agent Not Found" }
+  }
+
+  const title = `${agent.name} by ${agent.owner?.full_name ?? username}`
+  const description =
+    agent.description ||
+    `${agent.name} — an AI agent on the Web42 marketplace.`
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      ...(agent.profile_image_url && {
+        images: [{ url: agent.profile_image_url, alt: agent.name }],
+      }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      ...(agent.profile_image_url && {
+        images: [agent.profile_image_url],
+      }),
+    },
+  }
+}
 
 export default async function AgentPage({
   params,

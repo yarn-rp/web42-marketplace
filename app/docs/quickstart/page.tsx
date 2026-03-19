@@ -1,6 +1,13 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 
 import { CliInstallBlock } from "@/components/landing/cli-install-block"
+
+export const metadata: Metadata = {
+  title: "Quick Start",
+  description:
+    "Get up and running with Web42 in minutes. Install the CLI and start using AI agents right away.",
+}
 
 export default function DocsQuickstartPage() {
   return (

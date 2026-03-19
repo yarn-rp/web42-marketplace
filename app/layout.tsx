@@ -43,6 +43,7 @@ export const metadata = {
     "AI Agents, Agent Marketplace, CLI, Web42, OpenClaw, Install Agents, Publish Agents",
   icons: {
     icon: "/icon.svg",
+    apple: "/apple-icon.png",
   },
   openGraph: {
     title: "Web42 — The AI Agent Marketplace",
@@ -53,7 +54,10 @@ export const metadata = {
     url: defaultUrl,
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary_large_image" as const,
+    title: "Web42 — The AI Agent Marketplace",
+    description:
+      "Install expert-built AI agents in seconds or publish your own and earn. Platform-native agents for OpenClaw and more.",
   },
   alternates: {
     canonical: defaultUrl,
@@ -70,6 +74,27 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en" className={`${plusJakarta.variable} ${jetbrainsMono.variable} ${silkscreen.variable} font-sans`}>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "Web42",
+              url: defaultUrl,
+              description:
+                "Install expert-built AI agents in seconds or publish your own and earn.",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: {
+                  "@type": "EntryPoint",
+                  urlTemplate: `${defaultUrl}/explore?search={search_term_string}`,
+                },
+                "query-input": "required name=search_term_string",
+              },
+            }),
+          }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

@@ -1,4 +1,11 @@
 import Link from "next/link"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Monetization",
+  description:
+    "Price your AI agents, connect Stripe, and earn from your work on the Web42 marketplace.",
+}
 
 export default function DocsMonetizationPage() {
   return (

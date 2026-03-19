@@ -1,4 +1,11 @@
 import Link from "next/link"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Documentation",
+  description:
+    "Learn how to discover, install, publish, and monetize AI agent packages on the Web42 marketplace.",
+}
 
 export default function DocsOverviewPage() {
   return (

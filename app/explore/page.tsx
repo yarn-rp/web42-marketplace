@@ -1,6 +1,13 @@
 import { ReactElement, Suspense } from "react"
+import type { Metadata } from "next"
 
 import { Separator } from "@/components/ui/separator"
+
+export const metadata: Metadata = {
+  title: "Explore AI Agents",
+  description:
+    "Browse and discover expert-built AI agents on the Web42 marketplace. Filter by platform, category, and more.",
+}
 import { FadeIn } from "@/components/cult/fade-in"
 import { GradientHeading } from "@/components/cult/gradient-heading"
 import { AgentResults } from "@/components/agent-results"

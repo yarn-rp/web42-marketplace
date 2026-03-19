@@ -1,6 +1,13 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 
 import { CliInstallBlock } from "@/components/landing/cli-install-block"
+
+export const metadata: Metadata = {
+  title: "CLI Reference",
+  description:
+    "Complete command reference for the Web42 CLI. Install, search, publish, and manage AI agents from the terminal.",
+}
 
 export default function DocsCliPage() {
   return (

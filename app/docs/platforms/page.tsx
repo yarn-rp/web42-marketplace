@@ -1,4 +1,11 @@
 import Link from "next/link"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Supported Platforms",
+  description:
+    "Platforms and AI runtimes supported by Web42 agents — Claude, Codex, OpenCode, OpenClaw, and more.",
+}
 
 export default function DocsPlatformsPage() {
   return (
