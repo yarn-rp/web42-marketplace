@@ -2,6 +2,7 @@ import { Command } from "commander"
 import chalk from "chalk"
 import ora from "ora"
 import { v4 as uuidv4 } from "uuid"
+import type { CallInterceptor } from "@a2a-js/sdk/client"
 import { requireAuth, setConfigValue, getConfigValue } from "../utils/config.js"
 import { apiGet } from "../utils/api.js"
 
@@ -74,16 +75,14 @@ export const sendCommand = new Command("send")
 
     // 5. Bearer token interceptor
     const token = config.token!
-    const bearerInterceptor = {
-      before: async (args: Record<string, unknown>) => {
-        const options = (args.options as Record<string, unknown>) ?? {}
-        const serviceParameters = (options.serviceParameters as Record<string, string>) ?? {}
-        args.options = {
-          ...options,
-          serviceParameters: {
-            ...serviceParameters,
-            Authorization: `Bearer ${token}`,
-          },
+    const bearerInterceptor: CallInterceptor = {
+      before: async (args) => {
+        if (!args.options) {
+          args.options = {}
+        }
+        args.options.serviceParameters = {
+          ...(args.options.serviceParameters ?? {}),
+          Authorization: `Bearer ${token}`,
         }
       },
       after: async () => {},
@@ -98,7 +97,7 @@ export const sendCommand = new Command("send")
         ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
           transports: [new JsonRpcTransportFactory()],
           clientConfig: {
-            interceptors: [bearerInterceptor as Parameters<typeof ClientFactoryOptions.createFrom>[1]["clientConfig"]["interceptors"][0]],
+            interceptors: [bearerInterceptor],
           },
         })
       )
