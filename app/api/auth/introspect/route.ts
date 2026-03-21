@@ -1,9 +1,6 @@
 // POST /api/auth/introspect
 // Body: { token: string }
 // Response: { active: true, sub: string, email: string } | { active: false }
-//
-// Auth: caller must send Authorization: Bearer <INTROSPECT_SECRET>
-// (a shared secret between web42 serve and the marketplace, set via env var)
 
 import { authenticateRequest } from "@/lib/auth/cli-auth"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
@@ -16,14 +13,7 @@ function getSupabaseAdmin() {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  // 1. Validate introspect caller secret
-  const authHeader = request.headers.get("authorization")
-  const secret = authHeader?.replace("Bearer ", "")
-  if (!process.env.INTROSPECT_SECRET || secret !== process.env.INTROSPECT_SECRET) {
-    return Response.json({ active: false }, { status: 401 })
-  }
-
-  // 2. Extract token from body
+  // 1. Extract token from body
   let token: string | undefined
   try {
     const body = await request.json() as { token?: string }
@@ -34,7 +24,7 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!token) return Response.json({ active: false })
 
-  // 3. Validate against existing cli_tokens table via authenticateRequest
+  // 2. Validate against existing cli_tokens table via authenticateRequest
   const fakeRequest = new Request("http://localhost", {
     headers: { authorization: `Bearer ${token}` },
   })
@@ -42,7 +32,7 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!result) return Response.json({ active: false })
 
-  // 4. Fetch email from Supabase
+  // 3. Fetch email from Supabase
   const supabaseAdmin = getSupabaseAdmin()
   const { data: user } = await supabaseAdmin.auth.admin.getUserById(result.userId)
 
