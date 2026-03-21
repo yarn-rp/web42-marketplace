@@ -321,7 +321,8 @@ export const pushCommand = new Command("push")
   .option("--force", "Skip hash comparison and always push")
   .option("--force-avatar", "Explicitly upload avatar even if no other changes")
   .option("--agent <name>", "Push a specific agent (for multi-agent workspaces)")
-  .action(async (opts: { force?: boolean; forceAvatar?: boolean; agent?: string }) => {
+  .option("--url <url>", "Register as a live A2A agent at this public URL (e.g. ngrok URL)")
+  .action(async (opts: { force?: boolean; forceAvatar?: boolean; agent?: string; url?: string }) => {
     const config = requireAuth()
     const cwd = process.cwd()
 
@@ -387,9 +388,25 @@ export const pushCommand = new Command("push")
         spinner.succeed(
           `Pushed ${chalk.bold(`@${config.username}/${manifest.name}`)}`
         )
-      } catch (error: any) {
+
+        // Register as live A2A agent if --url provided
+        if (opts.url) {
+          const a2aSpinner = ora("Registering live agent URL...").start()
+          try {
+            await apiPost(`/api/agents/${manifest.name}/a2a`, {
+              a2a_url: opts.url,
+              a2a_enabled: true,
+              gateway_status: "live",
+            })
+            a2aSpinner.succeed(`Agent live at ${chalk.cyan(opts.url)}`)
+          } catch (err: unknown) {
+            a2aSpinner.fail("Failed to register live URL")
+            console.error(chalk.red(err instanceof Error ? err.message : String(err)))
+          }
+        }
+      } catch (error: unknown) {
         spinner.fail("Push failed")
-        console.error(chalk.red(error.message))
+        console.error(chalk.red(error instanceof Error ? error.message : String(error)))
         process.exit(1)
       }
       return
