@@ -77,7 +77,7 @@ class OpenClawAgentExecutor implements AgentExecutor {
             Authorization: `Bearer ${this.opts.openClawToken}`,
             'Content-Type': 'application/json',
             'x-openclaw-agent-id': this.opts.openClawAgent,
-            'x-openclaw-session-key': contextId,
+            'x-openclaw-session-key': `agent:${this.opts.openClawAgent}:${contextId}`,
           },
           body: JSON.stringify({
             model: 'openclaw',
