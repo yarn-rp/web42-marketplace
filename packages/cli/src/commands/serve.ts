@@ -46,16 +46,26 @@ interface OpenClawExecutorOptions {
   openClawPort: number;
   openClawToken: string;
   openClawAgent: string;
+  verbose?: boolean;
 }
 
 class OpenClawAgentExecutor implements AgentExecutor {
-  constructor(private opts: OpenClawExecutorOptions) {}
+  private verbose: boolean;
+
+  constructor(private opts: OpenClawExecutorOptions) {
+    this.verbose = opts.verbose ?? false;
+  }
 
   async execute(requestContext: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
     const { taskId, contextId, userMessage } = requestContext;
     const userText =
       (userMessage.parts as Array<{ kind: string; text?: string }>)
         .find((p) => p.kind === 'text')?.text ?? '';
+
+    if (this.verbose) {
+      console.log(chalk.gray(`[verbose] → OpenClaw request: agent=${this.opts.openClawAgent} session=${contextId} port=${this.opts.openClawPort}`));
+      console.log(chalk.gray(`[verbose] → message text: "${userText.slice(0, 100)}"`));
+    }
 
     let response: globalThis.Response;
     try {
@@ -83,13 +93,22 @@ class OpenClawAgentExecutor implements AgentExecutor {
       );
     }
 
+    if (this.verbose) {
+      console.log(chalk.gray(`[verbose] ← OpenClaw response: status=${response.status}`));
+    }
+
     if (!response.ok) {
+      if (this.verbose) {
+        const body = await response.text().catch(() => '(unreadable)');
+        console.log(chalk.gray(`[verbose] ← response body: ${body}`));
+      }
       throw new Error(`OpenClaw error: ${response.status} ${response.statusText}`);
     }
 
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let tokenCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -110,6 +129,7 @@ class OpenClawAgentExecutor implements AgentExecutor {
           };
           const token = chunk.choices?.[0]?.delta?.content;
           if (token) {
+            tokenCount++;
             eventBus.publish({
               kind: 'artifact-update',
               taskId,
@@ -124,6 +144,10 @@ class OpenClawAgentExecutor implements AgentExecutor {
           // ignore malformed SSE lines
         }
       }
+    }
+
+    if (this.verbose) {
+      console.log(chalk.gray(`[verbose] ← stream complete: ${tokenCount} tokens received`));
     }
 
     eventBus.publish({
@@ -188,6 +212,7 @@ export const serveCommand = new Command('serve')
   .option('--openclaw-port <port>', 'OpenClaw gateway port', '18789')
   .option('--openclaw-token <token>', 'OpenClaw gateway auth token (or set OPENCLAW_GATEWAY_TOKEN)')
   .option('--openclaw-agent <id>', 'OpenClaw agent ID to target', 'main')
+  .option('--verbose', 'Enable verbose request/response logging')
   .action(
     async (opts: {
       port: string;
@@ -195,7 +220,10 @@ export const serveCommand = new Command('serve')
       openclawPort: string;
       openclawToken?: string;
       openclawAgent: string;
+      verbose?: boolean;
     }) => {
+      const verbose = opts.verbose ?? false;
+
       // 1. Must be logged into web42
       let token: string;
       try {
@@ -270,17 +298,27 @@ export const serveCommand = new Command('serve')
 
       // Auth: validate caller's web42 Bearer token against marketplace introspect endpoint
       const userBuilder = async (req: ExpressRequest): Promise<User> => {
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) throw new Error('Missing token');
+        const callerToken = req.headers.authorization?.split(' ')[1];
+        if (!callerToken) throw new Error('Missing token');
+
+        if (verbose) {
+          const masked = `${callerToken.slice(0, 8)}...`;
+          console.log(chalk.gray(`[verbose] userBuilder: token=${masked} → introspecting...`));
+        }
 
         const res = await fetch(`${web42ApiUrl}/api/auth/introspect`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify({ token: callerToken }),
         });
 
         if (!res.ok) throw new Error('Introspect call failed');
         const result = (await res.json()) as { active: boolean; sub?: string; email?: string };
+
+        if (verbose) {
+          console.log(chalk.gray(`[verbose] userBuilder: token=${callerToken.slice(0, 8)}... → active=${result.active} sub=${result.sub ?? '(none)'}`));
+        }
+
         if (!result.active) throw new Error('Unauthorized');
 
         const userId = result.sub ?? '';
@@ -290,7 +328,7 @@ export const serveCommand = new Command('serve')
         };
       };
 
-      const executor = new OpenClawAgentExecutor({ openClawPort, openClawToken, openClawAgent });
+      const executor = new OpenClawAgentExecutor({ openClawPort, openClawToken, openClawAgent, verbose });
       const requestHandler = new DefaultRequestHandler(agentCard, new InMemoryTaskStore(), executor);
 
       // 5. Mount A2A SDK handlers
@@ -310,6 +348,11 @@ export const serveCommand = new Command('serve')
         if (publicUrl) console.log(chalk.dim(`  Public: ${publicUrl}`));
         console.log(chalk.dim(`  Agent card: http://localhost:${port}/.well-known/agent-card.json`));
         console.log(chalk.dim(`  JSON-RPC:   http://localhost:${port}/a2a/jsonrpc`));
+
+        if (verbose) {
+          console.log(chalk.gray(`[verbose] agent card url: http://localhost:${port}/.well-known/agent-card.json`));
+          console.log(chalk.gray(`[verbose] openclaw target: http://localhost:${openClawPort}/v1/chat/completions agent=${openClawAgent}`));
+        }
 
         await publishLiveUrl({
           apiUrl: web42ApiUrl,
