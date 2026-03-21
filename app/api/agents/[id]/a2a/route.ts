@@ -1,5 +1,5 @@
 import { createClient } from "@/db/supabase/server"
-import { authenticateRequest } from "@/lib/auth/cli-auth"
+import { authenticateRequest, getSupabaseAdmin } from "@/lib/auth/cli-auth"
 
 // GET /api/agents/:slug/a2a
 // Public — returns live agent info for discovery
@@ -50,7 +50,10 @@ export async function POST(
     return Response.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const { error } = await db
+  // UPDATE must use admin client — RLS blocks UPDATE for CLI Bearer token requests
+  // (auth.uid() is null server-side; ownership already verified above)
+  const adminDb = getSupabaseAdmin()
+  const { error } = await adminDb
     .from("agents")
     .update({
       a2a_url: body.a2a_url,

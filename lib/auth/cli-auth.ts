@@ -2,7 +2,7 @@ import { createHash } from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/db/supabase/server"
 
-function getSupabaseAdmin() {
+export function getSupabaseAdmin() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
