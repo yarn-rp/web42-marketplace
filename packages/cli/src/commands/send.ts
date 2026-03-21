@@ -1,6 +1,7 @@
 import { Command } from "commander"
 import chalk from "chalk"
 import ora from "ora"
+// @ts-ignore
 import { v4 as uuidv4 } from "uuid"
 import { requireAuth, setConfigValue, getConfigValue } from "../utils/config.js"
 import { apiGet } from "../utils/api.js"
@@ -98,9 +99,9 @@ export const sendCommand = new Command("send")
         ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
           transports: [new JsonRpcTransportFactory()],
           clientConfig: {
-            interceptors: [bearerInterceptor as Parameters<typeof ClientFactoryOptions.createFrom>[1]["clientConfig"]["interceptors"][0]],
+            interceptors: [bearerInterceptor as any],
           },
-        })
+        } as any)
       )
       client = await factory.createFromUrl(a2aData.a2a_url)
       connectSpinner.stop()
