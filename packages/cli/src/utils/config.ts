@@ -71,3 +71,14 @@ export function requireAuth(): Web42Config {
   }
   return cfg
 }
+
+// Generic key/value store for arbitrary CLI state (e.g. A2A contextIds)
+export function setConfigValue(key: string, value: string): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(config as any).set(key, value)
+}
+
+export function getConfigValue(key: string): string | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (config as any).get(key) as string | undefined
+}
