@@ -101,7 +101,10 @@ export const sendCommand = new Command("send")
           },
         })
       )
-      client = await factory.createFromUrl(a2aData.a2a_url)
+      // a2aData.a2a_url is the full JSON-RPC endpoint, e.g. https://foo.ngrok.dev/a2a/jsonrpc
+      // createFromUrl needs the base URL; it will append /.well-known/agent-card.json itself
+      const a2aBaseUrl = new URL(a2aData.a2a_url).origin
+      client = await factory.createFromUrl(a2aBaseUrl)
       connectSpinner.stop()
     } catch {
       connectSpinner.fail(`Could not reach agent at ${a2aData.a2a_url}`)
