@@ -140,6 +140,44 @@ class OpenClawAgentExecutor implements AgentExecutor {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function publishLiveUrl({
+  apiUrl,
+  token,
+  slug,
+  a2aUrl,
+  enabled,
+  gatewayStatus,
+}: {
+  apiUrl: string;
+  token: string;
+  slug: string;
+  a2aUrl: string | null;
+  enabled: boolean;
+  gatewayStatus: string;
+}): Promise<void> {
+  try {
+    const res = await fetch(`${apiUrl}/api/agents/${slug}/a2a`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ a2a_url: a2aUrl, a2a_enabled: enabled, gateway_status: gatewayStatus }),
+    });
+    if (!res.ok) {
+      console.warn(chalk.yellow(`⚠ Could not register URL with marketplace: ${res.status}`));
+    } else {
+      console.log(chalk.dim('  Registered with marketplace ✓'));
+    }
+  } catch (err) {
+    console.warn(chalk.yellow(`⚠ Could not register URL with marketplace: ${String(err)}`));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Command
 // ---------------------------------------------------------------------------
 
@@ -159,8 +197,10 @@ export const serveCommand = new Command('serve')
       openclawAgent: string;
     }) => {
       // 1. Must be logged into web42
+      let token: string;
       try {
-        requireAuth();
+        const authConfig = requireAuth();
+        token = authConfig.token!;
       } catch {
         console.error(chalk.red('Not authenticated. Run `web42 auth login` first.'));
         process.exit(1);
@@ -260,20 +300,41 @@ export const serveCommand = new Command('serve')
       );
       app.use('/a2a/jsonrpc', jsonRpcHandler({ requestHandler, userBuilder }));
 
+      const a2aUrl = `${publicUrl ?? `http://localhost:${port}`}/a2a/jsonrpc`;
+
       // 6. Start listening
-      app.listen(port, () => {
+      app.listen(port, async () => {
         spinner.stop();
         console.log(chalk.green(`\n✓ Agent "${manifest.name}" is live`));
         console.log(chalk.dim(`  Local:  http://localhost:${port}`));
         if (publicUrl) console.log(chalk.dim(`  Public: ${publicUrl}`));
         console.log(chalk.dim(`  Agent card: http://localhost:${port}/.well-known/agent-card.json`));
         console.log(chalk.dim(`  JSON-RPC:   http://localhost:${port}/a2a/jsonrpc`));
+
+        await publishLiveUrl({
+          apiUrl: web42ApiUrl,
+          token,
+          slug: manifest.name,
+          a2aUrl,
+          enabled: true,
+          gatewayStatus: 'live',
+        });
+
+        if (!publicUrl) {
+          console.log(chalk.yellow('  ⚠ No --url provided. Registered localhost URL is not publicly reachable; buyers cannot connect.'));
+        }
+
         console.log(chalk.dim('\nWaiting for requests... (Ctrl+C to stop)\n'));
       });
 
       // 7. Keep process alive
-      process.on('SIGINT', () => {
+      process.on('SIGINT', async () => {
         console.log(chalk.dim('\nShutting down...'));
+        await fetch(`${web42ApiUrl}/api/agents/${manifest.name}/a2a`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ a2a_url: null, a2a_enabled: false, gateway_status: 'offline' }),
+        }).catch(() => {}); // best-effort
         process.exit(0);
       });
     }
