@@ -170,7 +170,7 @@ export async function POST(request: Request) {
   }
 
   // Fetch the agent card from the remote URL
-  const cardUrl = `${agentUrl.replace(/\/$/, "")}/.well-known/agent.json`
+  const cardUrl = `${agentUrl.replace(/\/$/, "")}/.well-known/agent-card.json`
   let agentCard: AgentCardJSON
   try {
     const cardRes = await fetch(cardUrl, {

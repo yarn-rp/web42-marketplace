@@ -1,5 +1,5 @@
+import crypto from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { importSPKI, jwtVerify } from "jose"
 import { createClient } from "@/db/supabase/server"
 
 export function getSupabaseAdmin() {
@@ -11,56 +11,56 @@ export function getSupabaseAdmin() {
 
 interface AuthResult {
   userId: string
-  source: "jwt" | "session"
+  source: "cli" | "session"
 }
 
 /**
- * Authenticate a request from either a Web42 JWT Bearer token or a browser session cookie.
- * Returns the user ID and auth source, or null if unauthenticated.
+ * Authenticate a platform API request.
+ *
+ * Two distinct paths — not fallbacks:
+ *   - Bearer token  → CLI token (SHA256 hash lookup in cli_tokens)
+ *   - No Bearer     → Supabase session cookie (browser)
+ *
+ * Handshake JWTs (agent-scoped) are NOT validated here.
+ * Agents validate those via the /api/auth/introspect endpoint.
  */
 export async function authenticateRequest(
   request: Request
 ): Promise<AuthResult | null> {
   const authHeader = request.headers.get("authorization")
 
+  // CLI caller — Bearer token is a CLI token, validate via cli_tokens table
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7)
 
-    // Try to verify as a Web42-issued JWT
-    const publicKeyPem = process.env.JWT_PUBLIC_KEY
-    if (publicKeyPem) {
-      try {
-        const publicKey = await importSPKI(publicKeyPem, "RS256")
-        const { payload } = await jwtVerify(token, publicKey, {
-          issuer: "web42",
-        })
-        if (payload.sub) {
-          return { userId: payload.sub, source: "jwt" }
-        }
-      } catch {
-        // JWT verification failed — token is not a valid Web42 JWT
-      }
-    }
+    try {
+      const tokenHash = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex")
+      const supabaseAdmin = getSupabaseAdmin()
+      const { data: cliToken } = await supabaseAdmin
+        .from("cli_tokens")
+        .select("user_id, expires_at")
+        .eq("token_hash", tokenHash)
+        .single()
 
-    // Fallback: try Supabase session token
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      }
-    )
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      return { userId: user.id, source: "session" }
-    }
+      if (!cliToken) return null
 
-    return null
+      if (
+        cliToken.expires_at &&
+        new Date(cliToken.expires_at) < new Date()
+      ) {
+        return null
+      }
+
+      return { userId: cliToken.user_id, source: "cli" }
+    } catch {
+      return null
+    }
   }
 
-  // No Bearer token — try browser session cookie
+  // Browser caller — Supabase session cookie
   const db = await createClient()
   const {
     data: { user },
