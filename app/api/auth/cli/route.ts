@@ -117,31 +117,31 @@ export async function POST(request: Request) {
       )
     }
 
-    // Fetch user details from auth.users
-    const { data: authUser, error: userError } = await db.auth.admin.getUserById(
-      userId
-    )
+    // Fetch user details from public.users table
+    const { data: profile, error: profileError } = await db
+      .from("users")
+      .select("username, full_name, avatar_url")
+      .eq("id", userId)
+      .single()
 
-    if (userError || !authUser.user) {
-      console.error("[api/auth/cli POST poll] User fetch error:", userError)
+    if (profileError || !profile) {
+      console.error("[api/auth/cli POST poll] User fetch error:", profileError)
       return NextResponse.json(
         { error: "Failed to fetch user" },
         { status: 500 }
       )
     }
 
-    const user = authUser.user
-
     // Clean up the auth code
     await db.from("cli_auth_codes").delete().eq("code", code)
 
     return NextResponse.json({
       status: "authenticated",
-      user_id: user.id,
+      user_id: userId,
       token,
-      username: user.user_metadata?.username || "",
-      full_name: user.user_metadata?.full_name || "",
-      avatar_url: user.user_metadata?.avatar_url || "",
+      username: profile.username || "",
+      full_name: profile.full_name || "",
+      avatar_url: profile.avatar_url || "",
     })
   }
 
