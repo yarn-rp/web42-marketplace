@@ -1,4 +1,3 @@
-import { createClient } from "@/db/supabase/server"
 import { authenticateRequest, getSupabaseAdmin } from "@/lib/auth/cli-auth"
 
 // GET /api/agents/:slug/a2a
@@ -8,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const { id: slug } = await params
-  const db = await createClient()
+  const db = getSupabaseAdmin()
 
   const { data, error } = await db
     .from("agents")
@@ -37,10 +36,10 @@ export async function POST(
   }
 
   const body = await request.json()
-  const db = await createClient()
 
-  // Verify ownership
-  const { data: agent } = await db
+  // Verify ownership — use admin client since CLI requests have no Supabase session
+  const adminDb = getSupabaseAdmin()
+  const { data: agent } = await adminDb
     .from("agents")
     .select("owner_id")
     .eq("slug", slug)
