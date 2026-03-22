@@ -1,5 +1,5 @@
 import { importSPKI, jwtVerify } from "jose"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 const ALG = "RS256"

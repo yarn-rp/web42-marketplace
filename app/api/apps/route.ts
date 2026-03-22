@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { randomBytes, randomUUID } from "crypto"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import { authenticateRequest, getSupabaseAdmin } from "@/lib/auth/cli-auth"
 
 export async function GET(request: Request): Promise<Response> {
