@@ -2,33 +2,39 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/db/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { authenticateRequest } from "@/lib/auth/cli-auth"
-import { computeAgentHash } from "@/lib/sync/agent-sync"
+import type { AgentCardJSON, AgentExtension } from "@/lib/agent-card-utils"
+import type { MarketplaceExtensionParams } from "@/lib/agent-card-utils"
 
 export const dynamic = "force-dynamic"
 
-// GET /api/agents - list agents
+interface AgentUpsertFields {
+  agent_card: AgentCardJSON
+  a2a_url: string
+  profile_image_url: string | null
+  slug?: string
+}
+
+function getSupabaseAdmin() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
 export async function GET(request: Request) {
   const db = await createClient()
   const url = new URL(request.url)
   const search = url.searchParams.get("search")
   const username = url.searchParams.get("username")
+  const tags = url.searchParams.get("tags")           // comma-separated
+  const categories = url.searchParams.get("categories") // comma-separated
 
-  // Check if requester is authenticated (optional — unauthenticated requests still work)
   const auth = await authenticateRequest(request).catch(() => null)
 
   let isOwnerRequest = false
   let targetUser: { id: string } | null = null
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn("SUPABASE_SERVICE_ROLE_KEY not set — falling back to public client")
-    isOwnerRequest = false
-  }
-
-  // When the owner requests their own agents, use the admin client to bypass
-  // RLS (which filters out private/unlisted agents at the DB level).
-
   if (username && auth) {
-    // Fetch once only
     const result = await db
       .from("users")
       .select("id")
@@ -42,30 +48,34 @@ export async function GET(request: Request) {
     }
   }
 
-  const queryClient = isOwnerRequest
-    ? createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      )
-    : db
+  const queryClient = isOwnerRequest ? getSupabaseAdmin() : db
 
   let query = queryClient
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username)")
+    .select(
+      "id, slug, agent_card, readme, profile_image_url, a2a_url, owner_id, stars_count, interactions_count, approved, featured, published_at, created_at, updated_at, gateway_status, owner:users!owner_id(id, full_name, avatar_url, username)"
+    )
 
   if (username) {
     if (targetUser) {
       query = query.eq("owner_id", targetUser.id)
-      // Non-owner requests: only show public
-      if (!isOwnerRequest) {
-        query = query.eq("visibility", "public")
-      }
     }
-  } else {
-    // No username filter — only public
-    query = query.eq("visibility", "public")
   }
 
+  // For non-owner requests, always filter to public agents only.
+  // visibility lives in agent_card JSONB (not a column — dropped in migration 20260322010000).
+  if (!isOwnerRequest) {
+    query = query.filter(
+      "agent_card->capabilities->extensions",
+      "cs",
+      JSON.stringify([
+        {
+          uri: "https://web42.ai/ext/marketplace/v1",
+          params: { visibility: "public" },
+        },
+      ])
+    )
+  }
 
   if (search) {
     query = query.textSearch("search_vector", search, {
@@ -74,113 +84,199 @@ export async function GET(request: Request) {
     })
   }
 
-  query = query.order("stars_count", { ascending: false })
+  // Tag filtering: each tag must be present in the marketplace extension params
+  if (tags) {
+    const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean)
+    for (const tag of tagList) {
+      query = query.filter(
+        "agent_card->capabilities->extensions",
+        "cs",
+        JSON.stringify([
+          {
+            uri: "https://web42.ai/ext/marketplace/v1",
+            params: { tags: [tag] },
+          },
+        ])
+      )
+    }
+  }
+
+  // Category filtering: each category must be present in the marketplace extension params
+  if (categories) {
+    const catList = categories.split(",").map((c) => c.trim()).filter(Boolean)
+    for (const cat of catList) {
+      query = query.filter(
+        "agent_card->capabilities->extensions",
+        "cs",
+        JSON.stringify([
+          {
+            uri: "https://web42.ai/ext/marketplace/v1",
+            params: { categories: [cat] },
+          },
+        ])
+      )
+    }
+  }
+
+  // "live" > "offline" alphabetically, so descending puts live agents first
+  query = query
+    .order("gateway_status", { ascending: false })
+    .order("stars_count", { ascending: false })
 
   const { data, error } = await query
 
   if (error) {
+    console.error("[api/agents GET] DB error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   return NextResponse.json(data)
 }
 
-// POST /api/agents - create or update an agent (used by CLI push)
 export async function POST(request: Request) {
   const auth = await authenticateRequest(request)
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const userId = auth.userId
-
-  const adminDb = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
   const body = await request.json()
   const {
-    slug,
-    name,
-    description,
-    readme,
-    manifest,
-    cover_image_url,
-    demo_video_url,
+    url: agentUrl,
+    slug: explicitSlug,
     price_cents,
     currency,
     license,
     visibility,
-    tags,
-    profile_image_data,
-  } = body
+    categories: bodyCategories,
+    tags: bodyTags,
+    profile_image_url,
+  } = body as {
+    url: string
+    slug?: string
+    price_cents?: number
+    currency?: string
+    license?: string
+    visibility?: string
+    categories?: string[]
+    tags?: string[]
+    profile_image_url?: string
+  }
 
-  if (!slug || !name) {
+  if (!agentUrl) {
     return NextResponse.json(
-      { error: "slug and name are required" },
+      { error: "url is required (the agent's base URL)" },
       { status: 400 }
     )
   }
 
-  if (manifest && !manifest.platform) {
-    manifest.platform = "openclaw"
-  }
-
-  // Fields that the CLI can always update
-  const agentFields: Record<string, unknown> = {
-    name,
-    description: description ?? "",
-    readme: readme ?? "",
-    manifest: manifest ?? {},
-    cover_image_url,
-    demo_video_url,
-  }
-
-  // Marketplace-sensitive fields (price, currency, license, visibility)
-  // are ONLY set on create. Updates to these must go through the dashboard UI.
-  const createOnlyFields: Record<string, unknown> = {}
-  if (price_cents !== undefined) createOnlyFields.price_cents = price_cents
-  if (currency !== undefined) createOnlyFields.currency = currency
-  if (license !== undefined) createOnlyFields.license = license
-  if (visibility !== undefined) createOnlyFields.visibility = visibility
-
-  if (profile_image_data) {
-    try {
-      let base64 = profile_image_data.trim()
-      const dataUriMatch = base64.match(/^data:([^;]+);base64,(.*)$/)
-      if (dataUriMatch) {
-        base64 = dataUriMatch[2]
-      }
-
-      const buffer = Buffer.from(base64, "base64")
-      if (buffer.length > 0 && buffer.length <= 2 * 1024 * 1024) {
-        const safeSlug = slug.replace(/[^a-zA-Z0-9_-]/g, "_")
-        const { data: uploadData, error: uploadError } = await adminDb.storage
-          .from("agent-covers")
-          .upload(`${userId}/${safeSlug}/avatar.png`, buffer, {
-            contentType: "image/png",
-            upsert: true,
-          })
-
-        if (!uploadError) {
-          const { data: publicUrl } = adminDb.storage
-            .from("agent-covers")
-            .getPublicUrl(uploadData.path)
-          agentFields.profile_image_url = publicUrl.publicUrl
-        }
-      }
-    } catch (e) {
-      console.error("Error processing profile image data:", e)
+  // Fetch the agent card from the remote URL
+  const cardUrl = `${agentUrl.replace(/\/$/, "")}/.well-known/agent.json`
+  let agentCard: AgentCardJSON
+  try {
+    const cardRes = await fetch(cardUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!cardRes.ok) {
+      return NextResponse.json(
+        {
+          error: `Failed to fetch agent card: ${cardRes.status} ${cardRes.statusText}`,
+        },
+        { status: 400 }
+      )
     }
+    try {
+      agentCard = (await cardRes.json()) as AgentCardJSON
+    } catch (parseErr) {
+      if (parseErr instanceof SyntaxError) {
+        return NextResponse.json(
+          {
+            error:
+              "Agent returned invalid JSON — make sure /.well-known/agent.json is valid JSON",
+          },
+          { status: 400 }
+        )
+      }
+      throw parseErr
+    }
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error: `Network error fetching agent card from ${cardUrl}: ${err instanceof Error ? err.message : String(err)}`,
+      },
+      { status: 400 }
+    )
   }
 
-  const { data: existing } = await adminDb
+  // Merge Web42 marketplace extension into capabilities.extensions[]
+  const marketplaceParams: MarketplaceExtensionParams = {}
+  if (price_cents !== undefined) marketplaceParams.price_cents = price_cents
+  if (currency) marketplaceParams.currency = currency
+  if (license) marketplaceParams.license = license
+  if (visibility) marketplaceParams.visibility = visibility
+  if (bodyCategories) marketplaceParams.categories = bodyCategories
+  if (bodyTags) marketplaceParams.tags = bodyTags
+
+  if (Object.keys(marketplaceParams).length > 0) {
+    const caps = agentCard.capabilities ?? {}
+    const extensions: AgentExtension[] = caps.extensions ?? []
+
+    const existingIdx = extensions.findIndex(
+      (e) => e.uri === "https://web42.ai/ext/marketplace/v1"
+    )
+    const ext: AgentExtension = {
+      uri: "https://web42.ai/ext/marketplace/v1",
+      description: "Web42 marketplace listing metadata",
+      required: false,
+      params: marketplaceParams as Record<string, unknown>,
+    }
+
+    if (existingIdx >= 0) {
+      extensions[existingIdx] = ext
+    } else {
+      extensions.push(ext)
+    }
+
+    agentCard = { ...agentCard, capabilities: { ...caps, extensions } }
+  }
+
+  const cardName = agentCard.name ?? "Untitled"
+  const slug =
+    explicitSlug ??
+    cardName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+
+  const adminDb = getSupabaseAdmin()
+
+  // Try to find existing record by slug first (normal case)
+  const { data: existingBySlug } = await adminDb
     .from("agents")
     .select("id")
-    .eq("owner_id", userId)
+    .eq("owner_id", auth.userId)
     .eq("slug", slug)
     .maybeSingle()
+
+  // If not found by slug, try by a2a_url (handles re-registration after rename)
+  let existing: { id: string; slug?: string } | null = existingBySlug
+  if (!existing) {
+    const { data: existingByUrl } = await adminDb
+      .from("agents")
+      .select("id, slug")
+      .eq("owner_id", auth.userId)
+      .eq("a2a_url", agentUrl)
+      .maybeSingle()
+    existing = existingByUrl
+  }
+
+  const agentFields: AgentUpsertFields = {
+    agent_card: agentCard,
+    a2a_url: agentUrl,
+    profile_image_url: profile_image_url ?? agentCard.iconUrl ?? null,
+  }
+
+  // If found by URL and the slug has changed, update slug too
+  if (existing && existing.slug !== undefined && existing.slug !== slug) {
+    agentFields.slug = slug
+  }
 
   let agentId: string
   let isCreated = false
@@ -190,81 +286,48 @@ export async function POST(request: Request) {
       .from("agents")
       .update(agentFields)
       .eq("id", existing.id)
-      .select()
+      .select("id")
       .single()
 
     if (error) {
+      console.error("[api/agents POST] DB update error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-
     agentId = data.id
   } else {
     const { data, error } = await adminDb
       .from("agents")
       .insert({
         slug,
-        owner_id: userId,
-        visibility: "private",
+        owner_id: auth.userId,
         ...agentFields,
-        ...createOnlyFields,
       })
-      .select()
+      .select("id")
       .single()
 
     if (error) {
+      console.error("[api/agents POST] DB insert error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-
     agentId = data.id
     isCreated = true
   }
 
-  if (Array.isArray(tags)) {
-    await adminDb.from("agent_tags").delete().eq("agent_id", agentId)
-
-    const tagIds: string[] = []
-    for (const tagName of tags) {
-      const trimmed = (tagName as string).trim().toLowerCase()
-      if (!trimmed) continue
-
-      const { data: existingTag } = await adminDb
-        .from("tags")
-        .select("id")
-        .ilike("name", trimmed)
-        .maybeSingle()
-
-      if (existingTag) {
-        tagIds.push(existingTag.id)
-      } else {
-        const { data: created } = await adminDb
-          .from("tags")
-          .insert({ name: trimmed })
-          .select("id")
-          .single()
-        if (created) tagIds.push(created.id)
-      }
-    }
-
-    if (tagIds.length > 0) {
-      await adminDb
-        .from("agent_tags")
-        .insert(tagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })))
-    }
-  }
-
-  const syncResult = await computeAgentHash(agentId)
-
-  const { data: agentData } = await adminDb
+  const { data: agentData, error: fetchError } = await adminDb
     .from("agents")
     .select("*")
     .eq("id", agentId)
     .single()
 
+  if (fetchError) {
+    console.error("[api/agents POST] DB fetch error:", fetchError)
+    return NextResponse.json({ error: fetchError.message }, { status: 500 })
+  }
+
   return NextResponse.json(
     {
       agent: agentData,
       ...(isCreated ? { created: true } : { updated: true }),
-      hash: syncResult?.hash ?? null,
     },
     { status: isCreated ? 201 : 200 }
   )

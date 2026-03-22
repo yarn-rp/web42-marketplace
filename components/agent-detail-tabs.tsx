@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import type { MDXEditorMethods } from "@mdxeditor/editor"
 import {
   BookOpen,
+  CheckCircle2,
   FileIcon,
   FolderIcon,
   FolderOpen,
@@ -14,16 +15,18 @@ import {
   Sparkles,
   Wrench,
   X,
+  Zap,
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type {
-  Agent,
-  AgentFile,
-  AgentResource,
-  SkillEntry,
-  Tag,
-} from "@/lib/types"
+import type { Agent, AgentFile, AgentLicense, AgentResource, Tag } from "@/lib/types"
+import type { AgentSkillCard, AgentCardJSON } from "@/lib/agent-card-utils"
+import {
+  getCardName,
+  getCardDescription,
+  getMarketplaceExtension,
+  getCardSkills,
+} from "@/lib/agent-card-utils"
 import { updateAgentReadme } from "@/app/actions/agent"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -243,10 +246,10 @@ function ReadmeTab({
 function SkillsTab({
   skills,
 }: {
-  skills: (SkillEntry | string)[]
+  skills: AgentSkillCard[]
 }) {
   const normalized = (skills ?? []).map((s) =>
-    typeof s === "string" ? { name: s, description: "" } : s
+    typeof s === "string" ? { id: s, name: s, description: "" } : s
   )
   if (normalized.length === 0) {
     return (
@@ -272,6 +275,54 @@ function SkillsTab({
         </Card>
       ))}
     </div>
+  )
+}
+
+function CapabilitiesSection({
+  agentCard,
+}: {
+  agentCard: AgentCardJSON | null | undefined
+}) {
+  const capabilities = agentCard?.capabilities
+  const hasAny =
+    capabilities?.streaming ||
+    capabilities?.pushNotifications ||
+    capabilities?.stateTransitionHistory
+
+  if (!hasAny) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <Wrench className="mb-3 size-10 opacity-40" />
+        <p className="text-sm">No special capabilities configured.</p>
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <ul className="space-y-3">
+          {capabilities?.streaming && (
+            <li className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Streaming enabled</span>
+            </li>
+          )}
+          {capabilities?.pushNotifications && (
+            <li className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Push notifications enabled</span>
+            </li>
+          )}
+          {capabilities?.stateTransitionHistory && (
+            <li className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <span>State transition history</span>
+            </li>
+          )}
+        </ul>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -441,12 +492,14 @@ function AgentDetailsTab({
   selectedTagIds: string[]
   profileUsername: string
 }) {
+  const mktExt = getMarketplaceExtension(agent.agent_card)
+
   return (
     <div className="space-y-6">
       <AgentDetailsEditor
         agentId={agent.id}
-        currentName={agent.name}
-        currentDescription={agent.description}
+        currentName={getCardName(agent.agent_card)}
+        currentDescription={getCardDescription(agent.agent_card)}
         profileUsername={profileUsername}
       />
       <div className="grid gap-4 md:grid-cols-2">
@@ -457,15 +510,15 @@ function AgentDetailsTab({
         />
         <AgentLicenseSelect
           agentId={agent.id}
-          currentLicense={agent.license}
-          priceCents={agent.price_cents ?? 0}
+          currentLicense={(mktExt?.license as AgentLicense) ?? null}
+          priceCents={mktExt?.price_cents ?? 0}
           profileUsername={profileUsername}
         />
         <AgentPriceEditor
           agentId={agent.id}
-          currentPriceCents={agent.price_cents ?? 0}
-          currentLicense={agent.license}
-          currency={agent.currency ?? "usd"}
+          currentPriceCents={mktExt?.price_cents ?? 0}
+          currentLicense={(mktExt?.license as AgentLicense) ?? null}
+          currency={mktExt?.currency ?? "usd"}
           profileUsername={profileUsername}
         />
       </div>
@@ -483,7 +536,7 @@ function AgentDetailsTab({
       <div className="border-t pt-6">
         <AgentDeleteButton
           agentId={agent.id}
-          agentName={agent.name}
+          agentName={getCardName(agent.agent_card)}
           profileUsername={profileUsername}
         />
       </div>
@@ -503,7 +556,12 @@ export function AgentDetailTabs({
 }: AgentDetailTabsProps) {
   const readmeFile = files.find((f) => /^readme\.md$/i.test(f.path))
   const hasReadme = !!(agent.readme || readmeFile?.content)
-  const hasSkills = (agent.manifest?.skills ?? []).length > 0
+  const hasSkills = getCardSkills(agent.agent_card).length > 0
+  const hasCapabilities = !!(
+    agent.agent_card?.capabilities?.streaming ||
+    agent.agent_card?.capabilities?.pushNotifications ||
+    agent.agent_card?.capabilities?.stateTransitionHistory
+  )
   const defaultTab = hasReadme ? "readme" : hasSkills ? "skills" : "content"
 
   return (
@@ -517,6 +575,12 @@ export function AgentDetailTabs({
           <Sparkles className="size-3.5" />
           Skills
         </TabsTrigger>
+        {hasCapabilities && (
+          <TabsTrigger value="capabilities" className="gap-1.5">
+            <Zap className="size-3.5" />
+            Capabilities
+          </TabsTrigger>
+        )}
         <TabsTrigger value="content" className="gap-1.5">
           <FolderOpen className="size-3.5" />
           Content
@@ -540,8 +604,14 @@ export function AgentDetailTabs({
       </TabsContent>
 
       <TabsContent value="skills">
-        <SkillsTab skills={agent.manifest?.skills ?? []} />
+        <SkillsTab skills={getCardSkills(agent.agent_card)} />
       </TabsContent>
+
+      {hasCapabilities && (
+        <TabsContent value="capabilities">
+          <CapabilitiesSection agentCard={agent.agent_card} />
+        </TabsContent>
+      )}
 
       <TabsContent value="content">
         {isOwner || hasAccess ? (

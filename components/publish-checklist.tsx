@@ -19,6 +19,7 @@ import { toast } from "sonner"
 import type { PublishValidation } from "@/app/actions/agent"
 import { publishAgent, unpublishAgent } from "@/app/actions/agent"
 import type { Agent } from "@/lib/types"
+import { getMarketplaceExtension } from "@/lib/agent-card-utils"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -82,7 +83,8 @@ export function PublishChecklist({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const isPublished = agent.visibility === "public"
+  const mktExt = getMarketplaceExtension(agent.agent_card)
+  const isPublished = (mktExt?.visibility ?? "public") === "public" && !!agent.published_at
   const isFree = validation.isFree
 
   const requiredChecks = isFree
@@ -174,7 +176,7 @@ export function PublishChecklist({
           icon={Scale}
           label="License"
           passed={validation.license}
-          detail={agent.license ?? undefined}
+          detail={mktExt?.license ?? undefined}
         />
         <ChecklistItem
           icon={Tag}

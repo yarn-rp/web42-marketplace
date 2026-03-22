@@ -1,43 +1,37 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+// app/api/auth/cli/confirm/route.ts
+import { redirect } from "next/navigation"
+import { createClient } from "@/db/supabase/server"
+import { getSupabaseAdmin } from "@/lib/auth/cli-auth"
 
-import { createClient as createServerClient } from "@/db/supabase/server"
-
-export const dynamic = "force-dynamic"
-
-export async function POST(request: Request) {
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  const body = await request.json()
-  const { code } = body
+export async function GET(request: Request): Promise<Response> {
+  const url = new URL(request.url)
+  const code = url.searchParams.get("code")
 
   if (!code) {
-    return NextResponse.json({ error: "Code required" }, { status: 400 })
+    return new Response("Missing code parameter", { status: 400 })
   }
 
-  const supabase = await createServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Require authenticated session
+  const db = await createClient()
+  const { data: { user } } = await db.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Redirect to login with code so they can auth first
+    redirect(`/login?cli_code=${encodeURIComponent(code)}`)
   }
 
-  const { error } = await supabaseAdmin
+  const supabase = getSupabaseAdmin()
+
+  const { error } = await supabase
     .from("cli_auth_codes")
     .update({ user_id: user.id, status: "confirmed" })
     .eq("code", code)
     .eq("status", "pending")
 
   if (error) {
-    return NextResponse.json(
-      { error: "Code not found or expired" },
-      { status: 404 }
-    )
+    console.error("[api/auth/cli/confirm] DB error:", error)
+    return new Response("Failed to confirm code", { status: 500 })
   }
 
-  return NextResponse.json({ status: "confirmed" })
+  redirect("/login/cli-success")
 }

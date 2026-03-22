@@ -14,7 +14,7 @@ import {
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "trending", label: "Trending" },
   { value: "stars", label: "Most Stars" },
-  { value: "installs", label: "Most Installs" },
+  { value: "interactions", label: "Most Interactions" },
   { value: "recent", label: "Newest" },
 ]
 

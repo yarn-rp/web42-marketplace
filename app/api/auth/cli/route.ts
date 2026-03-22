@@ -1,81 +1,147 @@
-import { randomBytes, createHash } from "crypto"
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import crypto from "crypto"
 
 export const dynamic = "force-dynamic"
 
-export async function POST(request: Request) {
-  const supabaseAdmin = createClient(
+interface RegisterRequest {
+  action: "register"
+  code: string
+}
+
+interface PollRequest {
+  action: "poll"
+  code: string
+}
+
+type RequestBody = RegisterRequest | PollRequest
+
+function getSupabaseAdmin() {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-  const body = await request.json()
-  const { action, code } = body
+}
 
-  if (action === "register") {
-    if (!code) {
-      return NextResponse.json({ error: "Code required" }, { status: 400 })
+export async function POST(request: Request) {
+  const body: RequestBody = await request.json()
+
+  if (body.action === "register") {
+    const { code } = body as RegisterRequest
+
+    if (!code || typeof code !== "string" || code.length !== 32) {
+      return NextResponse.json(
+        { error: "Invalid code format (expected 32-char hex string)" },
+        { status: 400 }
+      )
     }
 
-    await supabaseAdmin.from("cli_auth_codes").delete().lt("expires_at", new Date().toISOString())
+    const db = getSupabaseAdmin()
 
-    const { error } = await supabaseAdmin.from("cli_auth_codes").insert({
+    // Store the pending auth code
+    const { error } = await db.from("cli_auth_codes").insert({
       code,
       status: "pending",
-      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     })
 
     if (error) {
-      return NextResponse.json({ error: "Failed to register code" }, { status: 500 })
+      console.error("[api/auth/cli POST register] DB error:", error)
+      return NextResponse.json(
+        { error: "Failed to register code" },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json({ status: "pending" })
+    return NextResponse.json({ success: true })
   }
 
-  if (action === "poll") {
-    if (!code) {
-      return NextResponse.json({ error: "Code required" }, { status: 400 })
+  if (body.action === "poll") {
+    const { code } = body as PollRequest
+
+    if (!code || typeof code !== "string" || code.length !== 32) {
+      return NextResponse.json(
+        { error: "Invalid code format" },
+        { status: 400 }
+      )
     }
 
-    const { data: entry } = await supabaseAdmin
+    const db = getSupabaseAdmin()
+
+    // Check if the code has been confirmed
+    const { data, error } = await db
       .from("cli_auth_codes")
-      .select("*")
+      .select("status, user_id, expires_at")
       .eq("code", code)
-      .gt("expires_at", new Date().toISOString())
       .single()
 
-    if (!entry) {
-      return NextResponse.json({ error: "Code not found or expired" }, { status: 404 })
-    }
-
-    if (entry.status === "pending") {
+    if (error) {
+      console.error("[api/auth/cli POST poll] DB select error:", error)
       return NextResponse.json({ status: "pending" })
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from("users")
-      .select("username, full_name, avatar_url")
-      .eq("id", entry.user_id)
-      .single()
+    if (!data) {
+      return NextResponse.json({ status: "pending" })
+    }
 
-    const rawToken = randomBytes(32).toString("hex")
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex")
+    // Check if code has expired
+    const now = new Date()
+    const expiresAt = new Date(data.expires_at)
+    if (now > expiresAt) {
+      return NextResponse.json({ status: "expired" })
+    }
 
-    await supabaseAdmin.from("cli_tokens").insert({
-      user_id: entry.user_id,
+    // Not yet confirmed
+    if (data.status !== "confirmed" || !data.user_id) {
+      return NextResponse.json({ status: "pending" })
+    }
+
+    // Code confirmed! Generate a token and fetch user data
+    const userId = data.user_id
+
+    // Create a CLI token
+    const tokenBytes = crypto.randomBytes(32)
+    const token = tokenBytes.toString("hex")
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
+
+    const { error: tokenError } = await db.from("cli_tokens").insert({
+      user_id: userId,
       token_hash: tokenHash,
-      name: `CLI login on ${new Date().toISOString().split("T")[0]}`,
+      name: "CLI Login",
     })
 
-    await supabaseAdmin.from("cli_auth_codes").delete().eq("code", code)
+    if (tokenError) {
+      console.error("[api/auth/cli POST poll] Token creation error:", tokenError)
+      return NextResponse.json(
+        { error: "Failed to create token" },
+        { status: 500 }
+      )
+    }
+
+    // Fetch user details from auth.users
+    const { data: authUser, error: userError } = await db.auth.admin.getUserById(
+      userId
+    )
+
+    if (userError || !authUser.user) {
+      console.error("[api/auth/cli POST poll] User fetch error:", userError)
+      return NextResponse.json(
+        { error: "Failed to fetch user" },
+        { status: 500 }
+      )
+    }
+
+    const user = authUser.user
+
+    // Clean up the auth code
+    await db.from("cli_auth_codes").delete().eq("code", code)
 
     return NextResponse.json({
       status: "authenticated",
-      token: rawToken,
-      user_id: entry.user_id,
-      username: profile?.username,
-      full_name: profile?.full_name,
-      avatar_url: profile?.avatar_url,
+      user_id: user.id,
+      token,
+      username: user.user_metadata?.username || "",
+      full_name: user.user_metadata?.full_name || "",
+      avatar_url: user.user_metadata?.avatar_url || "",
     })
   }
 

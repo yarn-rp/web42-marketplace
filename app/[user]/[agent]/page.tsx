@@ -5,10 +5,10 @@ import { AgentShowcase } from "@/components/agent-showcase"
 import { FadeIn } from "@/components/cult/fade-in"
 import {
   getAgentBySlug,
-  getAgentFiles,
   getAgentResources,
   getPublishValidation,
 } from "@/app/actions/agent"
+import { getCardName, getCardDescription } from "@/lib/agent-card-utils"
 import { getOrderForAgent, verifyAndFulfillCheckout } from "@/app/actions/stripe"
 import { getCachedTags } from "@/app/actions/filters"
 import { getCurrentProfile } from "@/app/actions/profile"
@@ -25,10 +25,11 @@ export async function generateMetadata({
     return { title: "Agent Not Found" }
   }
 
-  const title = `${agent.name} by ${agent.owner?.full_name ?? username}`
+  const name = getCardName(agent.agent_card)
+  const title = `${name} by ${agent.owner?.full_name ?? username}`
   const description =
-    agent.description ||
-    `${agent.name} — an AI agent on the Web42 marketplace.`
+    getCardDescription(agent.agent_card) ||
+    `${name} — an AI agent on the Web42 marketplace.`
 
   return {
     title,
@@ -38,7 +39,7 @@ export async function generateMetadata({
       description,
       type: "article",
       ...(agent.profile_image_url && {
-        images: [{ url: agent.profile_image_url, alt: agent.name }],
+        images: [{ url: agent.profile_image_url, alt: name }],
       }),
     },
     twitter: {
@@ -79,8 +80,7 @@ export default async function AgentPage({
   const hasAccess = agent.has_access ?? isOwner
   const profileUsername = agent.owner?.username ?? username
 
-  const [agentFiles, resources, validation, allTags, order] = await Promise.all([
-    getAgentFiles(agent.id),
+  const [resources, validation, allTags, order] = await Promise.all([
     getAgentResources(agent.id),
     isOwner ? getPublishValidation(agent.id) : null,
     isOwner ? getCachedTags() : [],
@@ -95,7 +95,6 @@ export default async function AgentPage({
         <FadeIn>
           <AgentShowcase
             agent={agent}
-            files={agentFiles}
             resources={resources}
             isOwner={isOwner}
             hasAccess={hasAccess}
