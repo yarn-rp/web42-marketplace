@@ -24,6 +24,22 @@ UPDATE agents SET agent_card = jsonb_build_object(
   'skills', COALESCE(manifest->'skills', '[]'::jsonb)
 );
 
+-- Drop dependent policies and indexes before dropping columns
+DROP POLICY IF EXISTS "Public can view public agents" ON public.agents;
+DROP POLICY IF EXISTS "Public can view agents" ON public.agents;
+DROP INDEX IF EXISTS idx_agents_visibility;
+DROP INDEX IF EXISTS idx_agents_installs;
+
+-- Drop the increment function that references installs_count
+DROP FUNCTION IF EXISTS increment_install_count(UUID);
+
+-- Recreate public-read policy using agent_card JSONB instead of visibility column
+CREATE POLICY "Public can view public agents" ON public.agents
+  FOR SELECT USING (
+    published_at IS NOT NULL
+    AND agent_card->'capabilities'->'extensions' @> '[{"uri":"https://web42.ai/ext/marketplace/v1","params":{"visibility":"public"}}]'::jsonb
+  );
+
 -- Drop columns migrated into agent_card
 ALTER TABLE agents DROP COLUMN IF EXISTS name;
 ALTER TABLE agents DROP COLUMN IF EXISTS description;
