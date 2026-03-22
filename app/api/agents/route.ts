@@ -2,8 +2,17 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/db/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { authenticateRequest } from "@/lib/auth/cli-auth"
+import type { AgentCardJSON, AgentExtension } from "@/lib/agent-card-utils"
+import type { MarketplaceExtensionParams } from "@/lib/agent-card-utils"
 
 export const dynamic = "force-dynamic"
+
+interface AgentUpsertFields {
+  agent_card: AgentCardJSON
+  a2a_url: string
+  profile_image_url: string | null
+  slug?: string
+}
 
 function getSupabaseAdmin() {
   return createSupabaseClient(
@@ -17,6 +26,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const search = url.searchParams.get("search")
   const username = url.searchParams.get("username")
+  const tags = url.searchParams.get("tags")           // comma-separated
+  const categories = url.searchParams.get("categories") // comma-separated
 
   const auth = await authenticateRequest(request).catch(() => null)
 
@@ -42,7 +53,7 @@ export async function GET(request: Request) {
   let query = queryClient
     .from("agents")
     .select(
-      "id, slug, agent_card, readme, profile_image_url, a2a_url, owner_id, stars_count, interactions_count, approved, featured, published_at, created_at, updated_at, owner:users!owner_id(id, full_name, avatar_url, username)"
+      "id, slug, agent_card, readme, profile_image_url, a2a_url, owner_id, stars_count, interactions_count, approved, featured, published_at, created_at, updated_at, gateway_status, owner:users!owner_id(id, full_name, avatar_url, username)"
     )
 
   if (username) {
@@ -70,11 +81,49 @@ export async function GET(request: Request) {
     })
   }
 
-  query = query.order("stars_count", { ascending: false })
+  // Tag filtering: each tag must be present in the marketplace extension params
+  if (tags) {
+    const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean)
+    for (const tag of tagList) {
+      query = query.filter(
+        "agent_card->capabilities->extensions",
+        "cs",
+        JSON.stringify([
+          {
+            uri: "https://web42.ai/ext/marketplace/v1",
+            params: { tags: [tag] },
+          },
+        ])
+      )
+    }
+  }
+
+  // Category filtering: each category must be present in the marketplace extension params
+  if (categories) {
+    const catList = categories.split(",").map((c) => c.trim()).filter(Boolean)
+    for (const cat of catList) {
+      query = query.filter(
+        "agent_card->capabilities->extensions",
+        "cs",
+        JSON.stringify([
+          {
+            uri: "https://web42.ai/ext/marketplace/v1",
+            params: { categories: [cat] },
+          },
+        ])
+      )
+    }
+  }
+
+  // "live" > "offline" alphabetically, so descending puts live agents first
+  query = query
+    .order("gateway_status", { ascending: false })
+    .order("stars_count", { ascending: false })
 
   const { data, error } = await query
 
   if (error) {
+    console.error("[api/agents GET] DB error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
@@ -95,8 +144,8 @@ export async function POST(request: Request) {
     currency,
     license,
     visibility,
-    categories,
-    tags,
+    categories: bodyCategories,
+    tags: bodyTags,
     profile_image_url,
   } = body as {
     url: string
@@ -119,7 +168,7 @@ export async function POST(request: Request) {
 
   // Fetch the agent card from the remote URL
   const cardUrl = `${agentUrl.replace(/\/$/, "")}/.well-known/agent.json`
-  let agentCard: Record<string, unknown>
+  let agentCard: AgentCardJSON
   try {
     const cardRes = await fetch(cardUrl, {
       headers: { Accept: "application/json" },
@@ -127,39 +176,56 @@ export async function POST(request: Request) {
     })
     if (!cardRes.ok) {
       return NextResponse.json(
-        { error: `Failed to fetch agent card: ${cardRes.status} ${cardRes.statusText}` },
+        {
+          error: `Failed to fetch agent card: ${cardRes.status} ${cardRes.statusText}`,
+        },
         { status: 400 }
       )
     }
-    agentCard = await cardRes.json()
+    try {
+      agentCard = (await cardRes.json()) as AgentCardJSON
+    } catch (parseErr) {
+      if (parseErr instanceof SyntaxError) {
+        return NextResponse.json(
+          {
+            error:
+              "Agent returned invalid JSON — make sure /.well-known/agent.json is valid JSON",
+          },
+          { status: 400 }
+        )
+      }
+      throw parseErr
+    }
   } catch (err) {
     return NextResponse.json(
-      { error: `Cannot reach agent at ${cardUrl}: ${String(err)}` },
+      {
+        error: `Network error fetching agent card from ${cardUrl}: ${err instanceof Error ? err.message : String(err)}`,
+      },
       { status: 400 }
     )
   }
 
   // Merge Web42 marketplace extension into capabilities.extensions[]
-  const marketplaceParams: Record<string, unknown> = {}
+  const marketplaceParams: MarketplaceExtensionParams = {}
   if (price_cents !== undefined) marketplaceParams.price_cents = price_cents
   if (currency) marketplaceParams.currency = currency
   if (license) marketplaceParams.license = license
   if (visibility) marketplaceParams.visibility = visibility
-  if (categories) marketplaceParams.categories = categories
-  if (tags) marketplaceParams.tags = tags
+  if (bodyCategories) marketplaceParams.categories = bodyCategories
+  if (bodyTags) marketplaceParams.tags = bodyTags
 
   if (Object.keys(marketplaceParams).length > 0) {
-    const caps = (agentCard.capabilities ?? {}) as Record<string, unknown>
-    const extensions = (caps.extensions ?? []) as Array<Record<string, unknown>>
+    const caps = agentCard.capabilities ?? {}
+    const extensions: AgentExtension[] = caps.extensions ?? []
 
     const existingIdx = extensions.findIndex(
       (e) => e.uri === "https://web42.ai/ext/marketplace/v1"
     )
-    const ext = {
+    const ext: AgentExtension = {
       uri: "https://web42.ai/ext/marketplace/v1",
       description: "Web42 marketplace listing metadata",
       required: false,
-      params: marketplaceParams,
+      params: marketplaceParams as Record<string, unknown>,
     }
 
     if (existingIdx >= 0) {
@@ -168,27 +234,45 @@ export async function POST(request: Request) {
       extensions.push(ext)
     }
 
-    caps.extensions = extensions
-    agentCard.capabilities = caps
+    agentCard = { ...agentCard, capabilities: { ...caps, extensions } }
   }
 
-  const cardName = (agentCard.name as string) ?? "Untitled"
+  const cardName = agentCard.name ?? "Untitled"
   const slug =
-    explicitSlug ?? cardName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    explicitSlug ??
+    cardName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
 
   const adminDb = getSupabaseAdmin()
 
-  const { data: existing } = await adminDb
+  // Try to find existing record by slug first (normal case)
+  const { data: existingBySlug } = await adminDb
     .from("agents")
     .select("id")
     .eq("owner_id", auth.userId)
     .eq("slug", slug)
     .maybeSingle()
 
-  const agentFields = {
+  // If not found by slug, try by a2a_url (handles re-registration after rename)
+  let existing: { id: string; slug?: string } | null = existingBySlug
+  if (!existing) {
+    const { data: existingByUrl } = await adminDb
+      .from("agents")
+      .select("id, slug")
+      .eq("owner_id", auth.userId)
+      .eq("a2a_url", agentUrl)
+      .maybeSingle()
+    existing = existingByUrl
+  }
+
+  const agentFields: AgentUpsertFields = {
     agent_card: agentCard,
     a2a_url: agentUrl,
-    profile_image_url: profile_image_url ?? (agentCard.iconUrl as string) ?? null,
+    profile_image_url: profile_image_url ?? agentCard.iconUrl ?? null,
+  }
+
+  // If found by URL and the slug has changed, update slug too
+  if (existing && existing.slug !== undefined && existing.slug !== slug) {
+    agentFields.slug = slug
   }
 
   let agentId: string
@@ -203,6 +287,7 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
+      console.error("[api/agents POST] DB update error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
     agentId = data.id
@@ -218,17 +303,23 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
+      console.error("[api/agents POST] DB insert error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
     agentId = data.id
     isCreated = true
   }
 
-  const { data: agentData } = await adminDb
+  const { data: agentData, error: fetchError } = await adminDb
     .from("agents")
     .select("*")
     .eq("id", agentId)
     .single()
+
+  if (fetchError) {
+    console.error("[api/agents POST] DB fetch error:", fetchError)
+    return NextResponse.json({ error: fetchError.message }, { status: 500 })
+  }
 
   return NextResponse.json(
     {

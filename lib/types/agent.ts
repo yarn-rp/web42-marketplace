@@ -45,6 +45,7 @@ export interface Agent {
   published_at: string | null
   created_at: string
   updated_at: string
+  gateway_status?: "live" | "offline" | null
   owner?: Profile
   categories?: Category[]
   tags?: Tag[]

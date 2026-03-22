@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/db/supabase/client"
 import {
   BookOpenIcon,
+  Code,
   LogIn,
   LogOutIcon,
   MenuIcon,
@@ -172,6 +173,13 @@ export function TopNav({ profile }: { profile: Profile | null }) {
                   <Link href={`/${profile.username}?tab=marketplace`}>
                     <StoreIcon className="mr-2 size-4" />
                     Marketplace
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/${profile.username}/settings/developer-apps`}>
+                    <Code className="mr-2 size-4" />
+                    Developer Apps
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSub>

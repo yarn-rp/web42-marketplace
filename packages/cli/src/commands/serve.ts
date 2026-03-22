@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from "fs"
-import { join } from "path"
 import { Command } from "commander"
 import chalk from "chalk"
 import ora from "ora"
@@ -98,35 +96,15 @@ export const serveCommand = new Command("serve")
         process.exit(1)
       }
 
-      const cwd = process.cwd()
       const port = parseInt(opts.port, 10)
       const publicUrl = opts.url
       const config = getConfig()
       const web42ApiUrl = config.apiUrl ?? "https://web42.ai"
 
-      // Read optional manifest.json for agent card metadata
-      const manifestPath = join(cwd, "manifest.json")
-      let agentName = "Local Agent"
-      let agentDescription = ""
-      let agentVersion = "1.0.0"
-      let skills: Array<{ id: string; name: string; description: string; tags: string[] }> = []
-
-      if (existsSync(manifestPath)) {
-        try {
-          const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"))
-          agentName = manifest.name ?? agentName
-          agentDescription = manifest.description ?? agentDescription
-          agentVersion = manifest.version ?? agentVersion
-          skills = (manifest.skills ?? []).map((s: { name: string; description?: string }) => ({
-            id: s.name.toLowerCase().replace(/\s+/g, "-"),
-            name: s.name,
-            description: s.description ?? "",
-            tags: [],
-          }))
-        } catch {
-          console.warn(chalk.yellow("Could not parse manifest.json, using defaults."))
-        }
-      }
+      const agentName = "Local Agent"
+      const agentDescription = ""
+      const agentVersion = "1.0.0"
+      const skills: Array<{ id: string; name: string; description: string; tags: string[] }> = []
 
       const spinner = ora("Starting A2A server...").start()
 
@@ -196,6 +174,22 @@ export const serveCommand = new Command("serve")
       app.use("/a2a/jsonrpc", jsonRpcHandler({ requestHandler, userBuilder }))
 
       const a2aUrl = `${publicUrl ?? `http://localhost:${port}`}/a2a/jsonrpc`
+
+      // Auto-register agent with directory
+      const registrationUrl = opts.url ?? `http://localhost:${port}`
+      try {
+        await fetch(`${web42ApiUrl}/api/agents`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url: registrationUrl }),
+        })
+        console.log(chalk.dim("  Pre-registered with marketplace"))
+      } catch {
+        console.warn(chalk.yellow("  Could not pre-register with marketplace"))
+      }
 
       app.listen(port, async () => {
         spinner.stop()

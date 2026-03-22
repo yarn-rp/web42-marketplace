@@ -8,6 +8,7 @@ import {
   ExternalLink,
   TagIcon,
   Users,
+  Zap,
 } from "lucide-react"
 
 import type { PublishValidation } from "@/app/actions/agent"
@@ -114,17 +115,25 @@ export function AgentShowcase({
           )}
           <div>
             <h1 className="text-3xl font-bold md:text-4xl">{agentName}</h1>
-            {platformInfo && (
-              <a
-                href={platformInfo.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium transition-colors hover:bg-accent"
-              >
-                <PlatformLogo platform={platformInfo} size={16} className="rounded-sm" />
-                {platformInfo.name}
-              </a>
-            )}
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {platformInfo && (
+                <a
+                  href={platformInfo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium transition-colors hover:bg-accent"
+                >
+                  <PlatformLogo platform={platformInfo} size={16} className="rounded-sm" />
+                  {platformInfo.name}
+                </a>
+              )}
+              {agent.gateway_status === "live" && (
+                <Badge variant="default" className="gap-1">
+                  <Zap className="size-3.5" />
+                  Live
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-3">
             {isOwner && validation && (

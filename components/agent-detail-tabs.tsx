@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import type { MDXEditorMethods } from "@mdxeditor/editor"
 import {
   BookOpen,
+  CheckCircle2,
   FileIcon,
   FolderIcon,
   FolderOpen,
@@ -14,11 +15,12 @@ import {
   Sparkles,
   Wrench,
   X,
+  Zap,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Agent, AgentFile, AgentLicense, AgentResource, Tag } from "@/lib/types"
-import type { AgentSkillCard } from "@/lib/agent-card-utils"
+import type { AgentSkillCard, AgentCardJSON } from "@/lib/agent-card-utils"
 import {
   getCardName,
   getCardDescription,
@@ -276,6 +278,54 @@ function SkillsTab({
   )
 }
 
+function CapabilitiesSection({
+  agentCard,
+}: {
+  agentCard: AgentCardJSON | null | undefined
+}) {
+  const capabilities = agentCard?.capabilities
+  const hasAny =
+    capabilities?.streaming ||
+    capabilities?.pushNotifications ||
+    capabilities?.stateTransitionHistory
+
+  if (!hasAny) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <Wrench className="mb-3 size-10 opacity-40" />
+        <p className="text-sm">No special capabilities configured.</p>
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <ul className="space-y-3">
+          {capabilities?.streaming && (
+            <li className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Streaming enabled</span>
+            </li>
+          )}
+          {capabilities?.pushNotifications && (
+            <li className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Push notifications enabled</span>
+            </li>
+          )}
+          {capabilities?.stateTransitionHistory && (
+            <li className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <span>State transition history</span>
+            </li>
+          )}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
 function ContentTab({ files }: { files: AgentFile[] }) {
   const [currentDir, setCurrentDir] = useState("")
   const [selectedFile, setSelectedFile] = useState<AgentFile | null>(null)
@@ -507,6 +557,11 @@ export function AgentDetailTabs({
   const readmeFile = files.find((f) => /^readme\.md$/i.test(f.path))
   const hasReadme = !!(agent.readme || readmeFile?.content)
   const hasSkills = getCardSkills(agent.agent_card).length > 0
+  const hasCapabilities = !!(
+    agent.agent_card?.capabilities?.streaming ||
+    agent.agent_card?.capabilities?.pushNotifications ||
+    agent.agent_card?.capabilities?.stateTransitionHistory
+  )
   const defaultTab = hasReadme ? "readme" : hasSkills ? "skills" : "content"
 
   return (
@@ -520,6 +575,12 @@ export function AgentDetailTabs({
           <Sparkles className="size-3.5" />
           Skills
         </TabsTrigger>
+        {hasCapabilities && (
+          <TabsTrigger value="capabilities" className="gap-1.5">
+            <Zap className="size-3.5" />
+            Capabilities
+          </TabsTrigger>
+        )}
         <TabsTrigger value="content" className="gap-1.5">
           <FolderOpen className="size-3.5" />
           Content
@@ -545,6 +606,12 @@ export function AgentDetailTabs({
       <TabsContent value="skills">
         <SkillsTab skills={getCardSkills(agent.agent_card)} />
       </TabsContent>
+
+      {hasCapabilities && (
+        <TabsContent value="capabilities">
+          <CapabilitiesSection agentCard={agent.agent_card} />
+        </TabsContent>
+      )}
 
       <TabsContent value="content">
         {isOwner || hasAccess ? (
