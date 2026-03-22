@@ -45,8 +45,13 @@ export async function POST(
     .eq("slug", slug)
     .single()
 
-  if (!agent || agent.owner_id !== authResult.userId) {
-    return Response.json({ error: "Forbidden" }, { status: 403 })
+  if (!agent) {
+    return Response.json({ error: "Agent not found by slug" }, { status: 404 })
+  }
+
+  if (agent.owner_id !== authResult.userId) {
+    console.error(`[api/agents/${slug}/a2a] ownership mismatch: agent.owner_id=${agent.owner_id} auth.userId=${authResult.userId}`)
+    return Response.json({ error: "Forbidden — not the agent owner" }, { status: 403 })
   }
 
   const { error } = await adminDb

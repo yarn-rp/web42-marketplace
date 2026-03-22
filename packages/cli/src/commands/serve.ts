@@ -174,7 +174,8 @@ async function publishLiveUrl({
       body: JSON.stringify({ a2a_url: a2aUrl, a2a_enabled: enabled, gateway_status: gatewayStatus }),
     })
     if (!res.ok) {
-      console.warn(chalk.yellow(`  Could not register URL with marketplace: ${res.status}`))
+      const errBody = await res.json().catch(() => ({})) as { error?: string }
+      console.warn(chalk.yellow(`  Could not register URL with marketplace: ${errBody.error ?? res.status}`))
     } else {
       console.log(chalk.dim("  Registered with marketplace"))
     }
