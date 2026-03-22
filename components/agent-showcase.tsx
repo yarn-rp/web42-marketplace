@@ -5,13 +5,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   CalendarIcon,
-  Download,
-  GitFork,
+  ExternalLink,
   TagIcon,
+  Users,
 } from "lucide-react"
 
 import type { PublishValidation } from "@/app/actions/agent"
-import type { Agent, AgentFile, AgentResource, Order, Tag } from "@/lib/types"
+import type { Agent, AgentResource, Order, Tag } from "@/lib/types"
+import { getCardName, getCardDescription, getMarketplaceExtension, getCardVersion, getCardProvider } from "@/lib/agent-card-utils"
 import { getPlatform } from "@/lib/platforms"
 import { PlatformLogo } from "@/components/platform-logo"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -27,17 +28,15 @@ import { Separator } from "@/components/ui/separator"
 import { AgentDetailTabs } from "./agent-detail-tabs"
 import { AgentPriceBadge } from "./agent-price-badge"
 import { CheckoutSuccess } from "./checkout-success"
+import { Button } from "@/components/ui/button"
 import { GetAgentButton } from "./get-agent-button"
-import { InstallButton } from "./install-button"
 import { RefundButton } from "./refund-button"
 import { PublishDialog } from "./publish-dialog"
-import { RemixButton } from "./remix-button"
 import { ResourceGallery } from "./resource-gallery"
 import { StarButton } from "./star-button"
 
 interface AgentShowcaseProps {
   agent: Agent
-  files?: AgentFile[]
   resources?: AgentResource[]
   isOwner?: boolean
   hasAccess?: boolean
@@ -53,7 +52,6 @@ interface AgentShowcaseProps {
 
 export function AgentShowcase({
   agent,
-  files = [],
   resources = [],
   isOwner = false,
   hasAccess = false,
@@ -69,7 +67,10 @@ export function AgentShowcase({
   const router = useRouter()
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
-  const platformInfo = getPlatform(agent.manifest?.platform)
+  const agentName = getCardName(agent.agent_card)
+  const agentDescription = getCardDescription(agent.agent_card)
+  const mktExt = getMarketplaceExtension(agent.agent_card)
+  const platformInfo = getPlatform(getCardProvider(agent.agent_card) ?? undefined)
 
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [galleryIndex, setGalleryIndex] = useState(0)
@@ -84,10 +85,10 @@ export function AgentShowcase({
     <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
       {(checkoutSuccess || freeAcquireSuccess) && (
         <CheckoutSuccess
-          agentName={agent.name}
+          agentName={agentName}
           agentSlug={agent.slug}
           username={username}
-          platform={agent.manifest?.platform}
+          platform={getCardProvider(agent.agent_card) ?? undefined}
           currentUsername={currentUsername}
           isFree={freeAcquireSuccess}
           onClose={
@@ -107,12 +108,12 @@ export function AgentShowcase({
           {agent.profile_image_url && (
             <img
               src={agent.profile_image_url}
-              alt={agent.name}
+              alt={agentName}
               className="size-16 shrink-0 rounded-xl object-cover"
             />
           )}
           <div>
-            <h1 className="text-3xl font-bold md:text-4xl">{agent.name}</h1>
+            <h1 className="text-3xl font-bold md:text-4xl">{agentName}</h1>
             {platformInfo && (
               <a
                 href={platformInfo.url}
@@ -136,14 +137,14 @@ export function AgentShowcase({
             )}
             {isOwner || hasAccess ? (
               <>
-                {!isOwner && !agent.remixed_from_id && (
-                  <RemixButton
-                    agentId={agent.id}
-                    agentName={agent.name}
-                    variant="outline"
-                  />
+                {agent.a2a_url && (
+                  <Button asChild size="sm">
+                    <a href={agent.a2a_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-1.5 size-3.5" />
+                      Use Agent
+                    </a>
+                  </Button>
                 )}
-                <InstallButton username={username} agentSlug={agent.slug} platform={agent.manifest?.platform} />
                 {!isOwner && order && (
                   <RefundButton
                     orderId={order.id}
@@ -155,10 +156,10 @@ export function AgentShowcase({
             ) : (
               <GetAgentButton
                 agentId={agent.id}
-                priceCents={agent.price_cents ?? 0}
+                priceCents={mktExt?.price_cents ?? 0}
                 isAuthenticated={isAuthenticated}
                 onSuccess={
-                  (agent.price_cents ?? 0) === 0
+                  (mktExt?.price_cents ?? 0) === 0
                     ? () => setFreeAcquireSuccess(true)
                     : undefined
                 }
@@ -166,7 +167,7 @@ export function AgentShowcase({
             )}
           </div>
         </div>
-        <p className="text-base text-muted-foreground">{agent.description}</p>
+        <p className="text-base text-muted-foreground">{agentDescription}</p>
       </div>
 
       {/* Resources gallery -- full width, max 4 visible */}
@@ -223,28 +224,12 @@ export function AgentShowcase({
       <div className="flex flex-col gap-8 md:flex-row">
         {/* Main content */}
         <div className="min-w-0 flex-1">
-          {/* Remixed from banner */}
-          {agent.remixed_from_id && agent.remixed_from && (
-            <div className="mb-6 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-4 py-3">
-              <GitFork className="size-4 shrink-0 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                Remixed from{" "}
-                <Link
-                  href={`/${agent.remixed_from.owner?.username}/${agent.remixed_from.slug}`}
-                  className="font-mono font-medium text-primary hover:underline"
-                >
-                  @{agent.remixed_from.owner?.username}/{agent.remixed_from.slug}
-                </Link>
-              </span>
-            </div>
-          )}
-
           <Separator className="mb-6" />
 
           {/* Tabbed content view */}
           <AgentDetailTabs
             agent={agent}
-            files={files}
+            files={[]}
             isOwner={isOwner}
             hasAccess={hasAccess}
             resources={resources}
@@ -302,22 +287,16 @@ export function AgentShowcase({
                   initialCount={agent.stars_count}
                 />
                 <span className="flex items-center gap-1 font-mono text-muted-foreground">
-                  <Download className="size-4" />
-                  {agent.installs_count}
+                  <Users className="size-4" />
+                  {agent.interactions_count}
                 </span>
-                {!agent.remixed_from_id && (
-                  <span className="flex items-center gap-1 font-mono text-muted-foreground">
-                    <GitFork className="size-4" />
-                    {agent.remixes_count}
-                  </span>
-                )}
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Price</span>
                 <AgentPriceBadge
-                  priceCents={agent.price_cents ?? 0}
-                  currency={agent.currency}
+                  priceCents={mktExt?.price_cents ?? 0}
+                  currency={mktExt?.currency ?? "usd"}
                 />
               </div>
 
@@ -349,103 +328,46 @@ export function AgentShowcase({
           </Card>
 
           {/* Details card */}
-          {agent.manifest && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {agent.manifest.version && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Version</span>
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      {agent.manifest.version}
-                    </Badge>
-                  </div>
-                )}
-                {agent.manifest.format && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Format</span>
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {agent.manifest.format}
-                    </Badge>
-                  </div>
-                )}
-                {agent.manifest.platform && !platformInfo && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Platform</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {agent.manifest.platform}
-                    </Badge>
-                  </div>
-                )}
-                {agent.manifest.author && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Author</span>
-                    <span className="font-mono text-xs">
-                      @{agent.manifest.author}
-                    </span>
-                  </div>
-                )}
-                {agent.manifest.modelPreferences?.primary && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Model</span>
-                    <span className="max-w-[180px] truncate text-xs">
-                      {agent.manifest.modelPreferences.primary}
-                    </span>
-                  </div>
-                )}
-                {agent.license && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">License</span>
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {agent.license}
-                    </Badge>
-                  </div>
-                )}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Version</span>
+                <Badge variant="secondary" className="font-mono text-xs">
+                  {getCardVersion(agent.agent_card)}
+                </Badge>
+              </div>
+              {getCardProvider(agent.agent_card) && !platformInfo && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Visibility</span>
-                  <Badge
-                    variant={
-                      agent.visibility === "public" ? "default" : "secondary"
-                    }
-                    className="text-xs"
-                  >
-                    {agent.visibility ?? "public"}
+                  <span className="text-muted-foreground">Provider</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {getCardProvider(agent.agent_card)}
                   </Badge>
                 </div>
-                {agent.manifest.plugins &&
-                  agent.manifest.plugins.length > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-muted-foreground">Plugins</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {agent.manifest.plugins.map((plugin: string) => (
-                          <Badge
-                            key={plugin}
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            {plugin}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                {isOwner &&
-                  agent.manifest.configVariables &&
-                  agent.manifest.configVariables.length > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        Config variables
-                      </span>
-                      <span className="font-mono text-xs">
-                        {agent.manifest.configVariables.length}
-                      </span>
-                    </div>
-                  )}
-              </CardContent>
-            </Card>
-          )}
+              )}
+              {mktExt?.license && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">License</span>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {mktExt.license}
+                  </Badge>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Visibility</span>
+                <Badge
+                  variant={
+                    (mktExt?.visibility ?? "public") === "public" ? "default" : "secondary"
+                  }
+                  className="text-xs"
+                >
+                  {mktExt?.visibility ?? "public"}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Categories */}
           {agent.categories && agent.categories.length > 0 && (
@@ -490,30 +412,6 @@ export function AgentShowcase({
             </Card>
           )}
 
-          {/* Remixed from */}
-          {agent.remixed_from_id && agent.remixed_from && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <GitFork className="size-4" />
-                  Remixed from
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link
-                  href={`/${agent.remixed_from.owner?.username}/${agent.remixed_from.slug}`}
-                  className="group flex items-center gap-2 text-sm hover:underline"
-                >
-                  <span className="font-mono font-medium text-primary">
-                    @{agent.remixed_from.owner?.username}/{agent.remixed_from.slug}
-                  </span>
-                </Link>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {agent.remixed_from.name}
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </aside>
       </div>
     </div>

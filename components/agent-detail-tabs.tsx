@@ -17,13 +17,14 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type {
-  Agent,
-  AgentFile,
-  AgentResource,
-  SkillEntry,
-  Tag,
-} from "@/lib/types"
+import type { Agent, AgentFile, AgentLicense, AgentResource, Tag } from "@/lib/types"
+import type { AgentSkillCard } from "@/lib/agent-card-utils"
+import {
+  getCardName,
+  getCardDescription,
+  getMarketplaceExtension,
+  getCardSkills,
+} from "@/lib/agent-card-utils"
 import { updateAgentReadme } from "@/app/actions/agent"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -243,10 +244,10 @@ function ReadmeTab({
 function SkillsTab({
   skills,
 }: {
-  skills: (SkillEntry | string)[]
+  skills: AgentSkillCard[]
 }) {
   const normalized = (skills ?? []).map((s) =>
-    typeof s === "string" ? { name: s, description: "" } : s
+    typeof s === "string" ? { id: s, name: s, description: "" } : s
   )
   if (normalized.length === 0) {
     return (
@@ -441,12 +442,14 @@ function AgentDetailsTab({
   selectedTagIds: string[]
   profileUsername: string
 }) {
+  const mktExt = getMarketplaceExtension(agent.agent_card)
+
   return (
     <div className="space-y-6">
       <AgentDetailsEditor
         agentId={agent.id}
-        currentName={agent.name}
-        currentDescription={agent.description}
+        currentName={getCardName(agent.agent_card)}
+        currentDescription={getCardDescription(agent.agent_card)}
         profileUsername={profileUsername}
       />
       <div className="grid gap-4 md:grid-cols-2">
@@ -457,15 +460,15 @@ function AgentDetailsTab({
         />
         <AgentLicenseSelect
           agentId={agent.id}
-          currentLicense={agent.license}
-          priceCents={agent.price_cents ?? 0}
+          currentLicense={(mktExt?.license as AgentLicense) ?? null}
+          priceCents={mktExt?.price_cents ?? 0}
           profileUsername={profileUsername}
         />
         <AgentPriceEditor
           agentId={agent.id}
-          currentPriceCents={agent.price_cents ?? 0}
-          currentLicense={agent.license}
-          currency={agent.currency ?? "usd"}
+          currentPriceCents={mktExt?.price_cents ?? 0}
+          currentLicense={(mktExt?.license as AgentLicense) ?? null}
+          currency={mktExt?.currency ?? "usd"}
           profileUsername={profileUsername}
         />
       </div>
@@ -483,7 +486,7 @@ function AgentDetailsTab({
       <div className="border-t pt-6">
         <AgentDeleteButton
           agentId={agent.id}
-          agentName={agent.name}
+          agentName={getCardName(agent.agent_card)}
           profileUsername={profileUsername}
         />
       </div>
@@ -503,7 +506,7 @@ export function AgentDetailTabs({
 }: AgentDetailTabsProps) {
   const readmeFile = files.find((f) => /^readme\.md$/i.test(f.path))
   const hasReadme = !!(agent.readme || readmeFile?.content)
-  const hasSkills = (agent.manifest?.skills ?? []).length > 0
+  const hasSkills = getCardSkills(agent.agent_card).length > 0
   const defaultTab = hasReadme ? "readme" : hasSkills ? "skills" : "content"
 
   return (
@@ -540,7 +543,7 @@ export function AgentDetailTabs({
       </TabsContent>
 
       <TabsContent value="skills">
-        <SkillsTab skills={agent.manifest?.skills ?? []} />
+        <SkillsTab skills={getCardSkills(agent.agent_card)} />
       </TabsContent>
 
       <TabsContent value="content">

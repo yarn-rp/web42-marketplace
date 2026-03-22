@@ -1,4 +1,5 @@
 import type { Profile } from "./profile"
+import type { AgentCardJSON } from "@/lib/agent-card-utils"
 
 export type AgentVisibility = "public" | "private" | "unlisted"
 
@@ -11,6 +12,11 @@ export type AgentLicense =
   | "Custom"
 
 export type AgentResourceType = "video" | "image" | "document"
+
+export interface AgentFile {
+  path: string
+  content: string | null
+}
 
 export interface AgentResource {
   id: string
@@ -27,28 +33,13 @@ export interface AgentResource {
 export interface Agent {
   id: string
   slug: string
-  name: string
-  description: string
+  agent_card: AgentCardJSON
   readme: string | null
-  cover_image_url: string | null
-  demo_video_url: string | null
   profile_image_url: string | null
-  manifest: AgentManifest
+  a2a_url: string | null
   owner_id: string
-  remixed_from_id: string | null
-  remixed_from?: {
-    id: string
-    slug: string
-    name: string
-    owner: { username: string }
-  } | null
-  visibility: AgentVisibility
-  license: AgentLicense | null
-  price_cents: number
-  currency: string
   stars_count: number
-  remixes_count: number
-  installs_count: number
+  interactions_count: number
   approved: boolean
   featured: boolean
   published_at: string | null
@@ -60,31 +51,16 @@ export interface Agent {
   resources?: AgentResource[]
   has_starred?: boolean
   has_access?: boolean
+  // Stripe connect fields
+  stripe_product_id?: string | null
+  stripe_price_id?: string | null
+  stripe_connect_account_id?: string | null
 }
 
 export interface AgentAccess {
   user_id: string
   agent_id: string
   price_cents_at_acquisition: number
-  created_at: string
-}
-
-export interface AgentVersion {
-  id: string
-  agent_id: string
-  version: string
-  changelog: string | null
-  created_at: string
-}
-
-export interface AgentFile {
-  id: string
-  agent_id: string
-  version_id: string | null
-  path: string
-  content: string | null
-  content_hash: string
-  storage_url: string
   created_at: string
 }
 
@@ -99,38 +75,6 @@ export interface Tag {
   id: string
   name: string
   created_at: string
-}
-
-export interface AgentManifest {
-  format?: string
-  platform?: string
-  name: string
-  description: string
-  version: string
-  author: string
-  skills?: SkillEntry[]
-  plugins?: string[]
-  modelPreferences?: {
-    primary?: string
-    fallback?: string
-  }
-  tags?: string[]
-  coverImage?: string
-  demoVideoUrl?: string
-  configVariables?: ConfigVariable[]
-}
-
-export interface SkillEntry {
-  name: string
-  description: string
-}
-
-export interface ConfigVariable {
-  key: string
-  label: string
-  description?: string
-  required: boolean
-  default?: string
 }
 
 export type OrderStatus = "pending" | "completed" | "refunded" | "failed"
@@ -170,41 +114,3 @@ export interface Refund {
   order?: Order
 }
 
-export interface AgentSnapshot {
-  identity: { name: string; slug: string; description: string }
-  readme: string
-  manifest: Record<string, unknown>
-  marketplace: {
-    price_cents: number
-    currency: string
-    license: string | null
-    visibility: string
-    tags: string[]
-  }
-  avatar_url: string | null
-  resources: Array<{
-    title: string
-    description: string | null
-    type: string
-    url: string
-    thumbnail_url: string | null
-    sort_order: number
-  }>
-  files: Array<{ path: string; content: string | null; content_hash: string }>
-}
-
-export interface SyncStatusResponse {
-  hash: string
-  updated_at: string
-}
-
-export interface SyncPushResponse {
-  hash: string
-  updated_at: string
-}
-
-export interface SyncPullResponse {
-  hash: string
-  updated_at: string
-  snapshot: AgentSnapshot
-}

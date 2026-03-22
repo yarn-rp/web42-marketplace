@@ -28,7 +28,6 @@ export default async function ExplorePage({
     category?: string
     tag?: string
     sort?: SortOption
-    platform?: string
     minPrice?: string
     maxPrice?: string
     minStars?: string
@@ -42,7 +41,6 @@ export default async function ExplorePage({
     category,
     tag,
     sort,
-    platform,
     minPrice,
     maxPrice,
     minStars,
@@ -53,14 +51,13 @@ export default async function ExplorePage({
   const categories = await getCachedCategories()
 
   const hasFilter =
-    search || category || tag || platform || minPrice || maxPrice || minStars || publishedFrom || creator
+    search || category || tag || minPrice || maxPrice || minStars || publishedFrom || creator
 
   const suspenseKey = JSON.stringify({
     search,
     category,
     tag,
     sort,
-    platform,
     minPrice,
     maxPrice,
     minStars,
@@ -111,7 +108,6 @@ export default async function ExplorePage({
               category={category}
               tag={tag}
               sort={sort}
-              platform={platform}
               minPrice={minPrice}
               maxPrice={maxPrice}
               minStars={minStars}

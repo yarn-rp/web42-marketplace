@@ -4,19 +4,41 @@ import ora from "ora"
 
 import { apiGet } from "../utils/api.js"
 
+interface AgentCardJSON {
+  name?: string
+  description?: string
+  capabilities?: {
+    extensions?: Array<{
+      uri: string
+      params?: Record<string, unknown>
+    }>
+  }
+}
+
 interface AgentResult {
   id: string
   slug: string
-  name: string
-  description: string
+  agent_card: AgentCardJSON
   stars_count: number
-  price_cents: number
-  manifest?: {
-    platform?: string
-  }
+  interactions_count: number
   owner: {
     username: string
   }
+}
+
+function getCardName(card: AgentCardJSON | null | undefined): string {
+  return card?.name ?? "Untitled Agent"
+}
+
+function getCardDescription(card: AgentCardJSON | null | undefined): string {
+  return card?.description ?? ""
+}
+
+function getMarketplacePrice(card: AgentCardJSON | null | undefined): number {
+  const ext = card?.capabilities?.extensions?.find(
+    (e) => e.uri === "https://web42.ai/ext/marketplace/v1"
+  )
+  return (ext?.params?.price_cents as number) ?? 0
 }
 
 function truncate(str: string, max: number): string {
@@ -27,15 +49,11 @@ function truncate(str: string, max: number): string {
 export const searchCommand = new Command("search")
   .description("Search the marketplace for agents")
   .argument("<query>", "Search query")
-  .option(
-    "-p, --platform <platform>",
-    "Filter results by platform (e.g. openclaw)"
-  )
   .option("-l, --limit <number>", "Max results to show", "10")
   .action(
     async (
       query: string,
-      opts: { platform?: string; limit: string }
+      opts: { limit: string }
     ) => {
       const spinner = ora(`Searching for "${query}"...`).start()
 
@@ -60,30 +78,25 @@ export const searchCommand = new Command("search")
         console.log()
 
         for (const agent of results) {
+          const name = getCardName(agent.agent_card)
+          const description = getCardDescription(agent.agent_card)
+          const priceCents = getMarketplacePrice(agent.agent_card)
           const ref = `@${agent.owner.username}/${agent.slug}`
           const stars =
             agent.stars_count > 0 ? chalk.yellow(` \u2605 ${agent.stars_count}`) : ""
           const price =
-            agent.price_cents > 0
-              ? chalk.green(` $${(agent.price_cents / 100).toFixed(2)}`)
+            priceCents > 0
+              ? chalk.green(` $${(priceCents / 100).toFixed(2)}`)
               : chalk.dim(" Free")
 
-          console.log(`  ${chalk.cyan.bold(agent.name)}${stars}${price}`)
+          console.log(`  ${chalk.cyan.bold(name)}${stars}${price}`)
           console.log(`  ${chalk.dim(ref)}`)
-          if (agent.description) {
-            console.log(`  ${truncate(agent.description, 80)}`)
+          if (description) {
+            console.log(`  ${truncate(description, 80)}`)
           }
-          const platform = agent.manifest?.platform ?? "openclaw"
-          if (agent.price_cents > 0) {
-            const siteUrl = process.env.WEB42_API_URL ?? "https://web42.ai"
-            console.log(
-              chalk.dim(`  Purchase: ${siteUrl}/${agent.owner.username}/${agent.slug}`)
-            )
-          } else {
-            console.log(
-              chalk.dim(`  Install: web42 ${platform} install ${ref}`)
-            )
-          }
+          console.log(
+            chalk.dim(`  Send: web42 send ${agent.slug} "hello"`)
+          )
           console.log()
         }
 
@@ -94,9 +107,9 @@ export const searchCommand = new Command("search")
             )
           )
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         spinner.fail("Search failed")
-        console.error(chalk.red(error.message))
+        console.error(chalk.red(String(error)))
         process.exit(1)
       }
     }

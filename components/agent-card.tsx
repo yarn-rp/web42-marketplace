@@ -2,12 +2,10 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Bot, Download, GitFork, Star } from "lucide-react"
+import { Bot, Star } from "lucide-react"
 
 import type { Agent } from "@/lib/types"
-import { getPlatform } from "@/lib/platforms"
-import { PlatformLogo } from "@/components/platform-logo"
-import { cn } from "@/lib/utils"
+import { getCardName, getCardDescription, getMarketplaceExtension } from "@/lib/agent-card-utils"
 import { AgentPriceBadge } from "@/components/agent-price-badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -33,7 +31,9 @@ export function AgentCard({
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
   const href = `/${username}/${agent.slug}`
-  const platformInfo = getPlatform(agent.manifest?.platform)
+  const name = getCardName(agent.agent_card)
+  const description = getCardDescription(agent.agent_card)
+  const marketplace = getMarketplaceExtension(agent.agent_card)
   const sortedResources = [...(agent.resources ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order
   )
@@ -67,7 +67,7 @@ export function AgentCard({
               ) : (
                 <img
                   src={thumbnail.url}
-                  alt={agent.name}
+                  alt={name}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
               )
@@ -76,7 +76,7 @@ export function AgentCard({
                 {agent.profile_image_url ? (
                   <img
                     src={agent.profile_image_url}
-                    alt={agent.name}
+                    alt={name}
                     className="size-16 rounded-xl object-cover opacity-60"
                   />
                 ) : (
@@ -87,8 +87,8 @@ export function AgentCard({
             {showPrice && (
               <div className="absolute right-3 top-3">
                 <AgentPriceBadge
-                  priceCents={agent.price_cents ?? 0}
-                  currency={agent.currency}
+                  priceCents={marketplace?.price_cents ?? 0}
+                  currency={marketplace?.currency ?? "usd"}
                   className="text-xs"
                 />
               </div>
@@ -101,7 +101,7 @@ export function AgentCard({
               {agent.profile_image_url ? (
                 <img
                   src={agent.profile_image_url}
-                  alt={agent.name}
+                  alt={name}
                     className="size-9 shrink-0 rounded-md object-cover"
                 />
               ) : (
@@ -114,7 +114,7 @@ export function AgentCard({
               )}
               <div className="min-w-0 flex-1">
                 <CardTitle className="truncate text-sm font-semibold leading-tight">
-                  {agent.name}
+                  {name}
                 </CardTitle>
                 <span className="font-mono text-[11px] text-muted-foreground">
                   @{username}
@@ -125,19 +125,8 @@ export function AgentCard({
 
           {/* 3. Description + tags -- flex-1 absorbs height variance */}
           <CardContent className="flex flex-1 flex-col gap-2 px-4 pb-2">
-            {agent.remixed_from && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <GitFork className="size-3" />
-                <span>
-                  Remixed from{" "}
-                  <span className="font-mono font-medium text-foreground">
-                    @{agent.remixed_from.owner?.username}/{agent.remixed_from.slug}
-                  </span>
-                </span>
-              </div>
-            )}
             <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-              {agent.description}
+              {description}
             </p>
 
             {/* 4. Tags */}
@@ -166,29 +155,20 @@ export function AgentCard({
 
           {/* 5. Footer -- pinned to bottom */}
           <CardFooter className="mt-auto flex items-center gap-3 px-4 pb-4 pt-2 font-mono text-xs text-muted-foreground">
-            {platformInfo && (
-              <span className="flex items-center gap-1" title={platformInfo.name}>
-                <PlatformLogo platform={platformInfo} size={16} className="rounded-sm" />
-              </span>
-            )}
             <span className="flex items-center gap-1">
               <Star className="size-3" />
               {agent.stars_count}
             </span>
-            <span className="flex items-center gap-1">
-              <Download className="size-3" />
-              {agent.installs_count}
-            </span>
-            {agent.license && (
+            {marketplace?.license && (
               <Badge variant="outline" className="ml-auto font-mono text-[10px]">
-                {agent.license}
+                {marketplace.license}
               </Badge>
             )}
-            {!agent.license && (agent.price_cents ?? 0) > 0 && (
+            {!marketplace?.license && (marketplace?.price_cents ?? 0) > 0 && (
               <div className="ml-auto">
                 <AgentPriceBadge
-                  priceCents={agent.price_cents ?? 0}
-                  currency={agent.currency}
+                  priceCents={marketplace?.price_cents ?? 0}
+                  currency={marketplace?.currency ?? "usd"}
                   className="text-[10px]"
                 />
               </div>

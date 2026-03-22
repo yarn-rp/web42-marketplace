@@ -4,61 +4,106 @@ import ora from "ora"
 import { v4 as uuidv4 } from "uuid"
 import type { CallInterceptor } from "@a2a-js/sdk/client"
 import { requireAuth, setConfigValue, getConfigValue } from "../utils/config.js"
-import { apiGet } from "../utils/api.js"
+import { apiPost } from "../utils/api.js"
 
-interface A2AData {
-  a2a_url?: string
-  a2a_enabled?: boolean
-  gateway_status?: string
+interface CachedToken {
+  token: string
+  agentUrl: string
+  expiresAt: string
+}
+
+interface HandshakeResponse {
+  token: string
+  agentUrl: string
+  expiresAt: string
+}
+
+function isUrl(s: string): boolean {
+  return s.startsWith("http://") || s.startsWith("https://")
+}
+
+function getCachedToken(slug: string): CachedToken | null {
+  const raw = getConfigValue(`agentTokens.${slug}`)
+  if (!raw) return null
+  try {
+    const cached =
+      typeof raw === "string" ? JSON.parse(raw) : (raw as unknown as CachedToken)
+    if (new Date(cached.expiresAt) <= new Date()) return null
+    return cached
+  } catch {
+    return null
+  }
 }
 
 export const sendCommand = new Command("send")
-  .description("Send a message to a live web42 agent")
-  .argument("<agent>", "Agent handle, e.g. @javier/gilfoyle")
+  .description("Send a message to an A2A agent")
+  .argument("<agent>", "Agent slug (e.g. my-agent) or direct URL (http://localhost:3001)")
   .argument("<message>", "Message to send")
   .option("--new", "Start a new conversation (clears saved context)")
-  .action(async (agentHandle: string, userMessage: string, opts: { new?: boolean }) => {
+  .option("--context <id>", "Use a specific context ID")
+  .action(async (agent: string, userMessage: string, opts: { new?: boolean; context?: string }) => {
     const config = requireAuth()
 
-    // 1. Parse @user/slug
-    const match = agentHandle.match(/^@?([\w-]+)\/([\w-]+)$/)
-    if (!match) {
-      console.error(chalk.red("Invalid agent handle. Expected format: @user/agent-slug"))
-      process.exit(1)
+    let agentUrl: string
+    let bearerToken: string
+    let agentKey: string
+
+    if (isUrl(agent)) {
+      // Direct URL mode — local development, no handshake needed
+      agentUrl = agent
+      bearerToken = config.token!
+      agentKey = new URL(agent).host.replace(/[.:]/g, "-")
+    } else {
+      // Slug mode — handshake with Web42 platform
+      agentKey = agent
+
+      const cached = getCachedToken(agent)
+
+      if (cached) {
+        agentUrl = cached.agentUrl
+        bearerToken = cached.token
+      } else {
+        const spinner = ora(`Authenticating with ${agent}...`).start()
+        try {
+          const res = await apiPost<HandshakeResponse>("/api/auth/handshake", {
+            agentSlug: agent,
+          })
+          agentUrl = res.agentUrl
+          bearerToken = res.token
+
+          setConfigValue(
+            `agentTokens.${agent}`,
+            JSON.stringify({
+              token: res.token,
+              agentUrl: res.agentUrl,
+              expiresAt: res.expiresAt,
+            })
+          )
+
+          spinner.succeed(`Authenticated with ${agent}`)
+        } catch (err) {
+          spinner.fail(`Failed to authenticate with ${agent}`)
+          console.error(chalk.red(String(err)))
+          process.exit(1)
+        }
+      }
     }
-    const [, username, slug] = match
 
-    // 2. Look up agent A2A URL from marketplace
-    const spinner = ora(`Looking up @${username}/${slug}...`).start()
-    let a2aData: A2AData
+    // Resolve contextId
+    const contextKey = `context.${agentKey}`
+    let contextId: string
 
-    try {
-      a2aData = await apiGet<A2AData>(`/api/agents/${slug}/a2a`)
-    } catch {
-      spinner.fail(`Agent @${username}/${slug} not found`)
-      process.exit(1)
-    }
-
-    if (!a2aData.a2a_enabled || !a2aData.a2a_url) {
-      spinner.fail(
-        `@${username}/${slug} is not live. Publisher must run: web42 serve --url <url>`
-      )
-      process.exit(1)
-    }
-
-    spinner.stop()
-
-    // 3. Resolve contextId — reuse existing session or start fresh
-    const contextKey = `context.${username}.${slug}`
-    let contextId = getConfigValue(contextKey) ?? uuidv4()
-
-    if (opts.new) {
+    if (opts.context) {
+      contextId = opts.context
+    } else if (opts.new) {
       contextId = uuidv4()
+    } else {
+      contextId = getConfigValue(contextKey) ?? uuidv4()
     }
 
     setConfigValue(contextKey, contextId)
 
-    // 4. Dynamically import @a2a-js/sdk client (ESM)
+    // Dynamically import @a2a-js/sdk client
     let ClientFactory: typeof import("@a2a-js/sdk/client").ClientFactory
     let JsonRpcTransportFactory: typeof import("@a2a-js/sdk/client").JsonRpcTransportFactory
     let ClientFactoryOptions: typeof import("@a2a-js/sdk/client").ClientFactoryOptions
@@ -73,23 +118,18 @@ export const sendCommand = new Command("send")
       process.exit(1)
     }
 
-    // 5. Bearer token interceptor
-    const token = config.token!
     const bearerInterceptor: CallInterceptor = {
       before: async (args) => {
-        if (!args.options) {
-          args.options = {}
-        }
+        if (!args.options) args.options = {}
         args.options.serviceParameters = {
           ...(args.options.serviceParameters ?? {}),
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${bearerToken}`,
         }
       },
       after: async () => {},
     }
 
-    // 6. Create A2A client
-    const connectSpinner = ora(`Connecting to @${username}/${slug}...`).start()
+    const connectSpinner = ora(`Connecting to ${agentKey}...`).start()
     let client: Awaited<ReturnType<InstanceType<typeof ClientFactory>["createFromUrl"]>>
 
     try {
@@ -101,18 +141,15 @@ export const sendCommand = new Command("send")
           },
         })
       )
-      // a2aData.a2a_url is the full JSON-RPC endpoint, e.g. https://foo.ngrok.dev/a2a/jsonrpc
-      // createFromUrl needs the base URL; it will append /.well-known/agent-card.json itself
-      const a2aBaseUrl = new URL(a2aData.a2a_url).origin
+      const a2aBaseUrl = new URL(agentUrl).origin
       client = await factory.createFromUrl(a2aBaseUrl)
       connectSpinner.stop()
     } catch {
-      connectSpinner.fail(`Could not reach agent at ${a2aData.a2a_url}`)
-      console.error(chalk.dim("Is the publisher running web42 serve? Is ngrok still active?"))
+      connectSpinner.fail(`Could not reach agent at ${agentUrl}`)
+      console.error(chalk.dim("Is the agent server running?"))
       process.exit(1)
     }
 
-    // 7. Stream response to stdout
     try {
       const stream = client.sendMessageStream({
         message: {

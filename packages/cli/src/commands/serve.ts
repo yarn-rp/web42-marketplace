@@ -1,384 +1,240 @@
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { Command } from 'commander';
-import chalk from 'chalk';
-import ora from 'ora';
-import express from 'express';
-import type { Request as ExpressRequest } from 'express';
+import { existsSync, readFileSync } from "fs"
+import { join } from "path"
+import { Command } from "commander"
+import chalk from "chalk"
+import ora from "ora"
+import express from "express"
 import {
   agentCardHandler,
   jsonRpcHandler,
-} from '@a2a-js/sdk/server/express';
+} from "@a2a-js/sdk/server/express"
 import {
   DefaultRequestHandler,
   InMemoryTaskStore,
   type AgentExecutor,
   type RequestContext,
   type ExecutionEventBus,
-} from '@a2a-js/sdk/server';
-import type { AgentCard } from '@a2a-js/sdk';
-import type { User } from '@a2a-js/sdk/server';
-import { requireAuth } from '../utils/config.js';
-import { getConfig } from '../utils/config.js';
+} from "@a2a-js/sdk/server"
+import type { AgentCard } from "@a2a-js/sdk"
+import type { User } from "@a2a-js/sdk/server"
+import { requireAuth, getConfig } from "../utils/config.js"
 
 // ---------------------------------------------------------------------------
-// Types
+// StdinExecutor — generic executor that pipes user messages to a subprocess
 // ---------------------------------------------------------------------------
 
-interface ManifestSkill {
-  name: string;
-  description?: string;
-}
-
-interface Manifest {
-  name: string;
-  description?: string;
-  version?: string;
-  skills?: ManifestSkill[];
-  [key: string]: unknown;
-}
-
-// ---------------------------------------------------------------------------
-// OpenClawAgentExecutor — bridges A2A to OpenClaw's OpenAI-compatible endpoint
-// ---------------------------------------------------------------------------
-
-interface OpenClawExecutorOptions {
-  openClawPort: number;
-  openClawToken: string;
-  openClawAgent: string;
-  verbose?: boolean;
-}
-
-class OpenClawAgentExecutor implements AgentExecutor {
-  private verbose: boolean;
-
-  constructor(private opts: OpenClawExecutorOptions) {
-    this.verbose = opts.verbose ?? false;
-  }
-
+class EchoExecutor implements AgentExecutor {
   async execute(requestContext: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
-    const { taskId, contextId, userMessage } = requestContext;
+    const { taskId, contextId, userMessage } = requestContext
     const userText =
       (userMessage.parts as Array<{ kind: string; text?: string }>)
-        .find((p) => p.kind === 'text')?.text ?? '';
-
-    if (this.verbose) {
-      console.log(chalk.gray(`[verbose] → OpenClaw request: agent=${this.opts.openClawAgent} session=${contextId} port=${this.opts.openClawPort}`));
-      console.log(chalk.gray(`[verbose] → message text: "${userText.slice(0, 100)}"`));
-    }
-
-    let response: globalThis.Response;
-    try {
-      response = await fetch(
-        `http://localhost:${this.opts.openClawPort}/v1/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.opts.openClawToken}`,
-            'Content-Type': 'application/json',
-            'x-openclaw-agent-id': this.opts.openClawAgent,
-            'x-openclaw-session-key': `agent:${this.opts.openClawAgent}:${contextId}`,
-          },
-          body: JSON.stringify({
-            model: 'openclaw',
-            stream: true,
-            messages: [{ role: 'user', content: userText }],
-          }),
-        }
-      );
-    } catch (err) {
-      throw new Error(
-        `OpenClaw is not reachable on port ${this.opts.openClawPort}. ` +
-          `Make sure it is running with chatCompletions enabled. (${String(err)})`
-      );
-    }
-
-    if (this.verbose) {
-      console.log(chalk.gray(`[verbose] ← OpenClaw response: status=${response.status}`));
-    }
-
-    if (!response.ok) {
-      if (this.verbose) {
-        const body = await response.text().catch(() => '(unreadable)');
-        console.log(chalk.gray(`[verbose] ← response body: ${body}`));
-      }
-      throw new Error(`OpenClaw error: ${response.status} ${response.statusText}`);
-    }
-
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let tokenCount = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
-
-        try {
-          const chunk = JSON.parse(data) as {
-            choices?: Array<{ delta?: { content?: string } }>;
-          };
-          const token = chunk.choices?.[0]?.delta?.content;
-          if (token) {
-            tokenCount++;
-            eventBus.publish({
-              kind: 'artifact-update',
-              taskId,
-              contextId,
-              artifact: {
-                artifactId: 'response',
-                parts: [{ kind: 'text', text: token }],
-              },
-            });
-          }
-        } catch {
-          // ignore malformed SSE lines
-        }
-      }
-    }
-
-    if (this.verbose) {
-      console.log(chalk.gray(`[verbose] ← stream complete: ${tokenCount} tokens received`));
-    }
+        .find((p) => p.kind === "text")?.text ?? ""
 
     eventBus.publish({
-      kind: 'status-update',
+      kind: "artifact-update",
       taskId,
       contextId,
-      status: { state: 'completed', timestamp: new Date().toISOString() },
-      final: true,
-    });
-    eventBus.finished();
-  }
-
-  cancelTask = async (): Promise<void> => {};
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function publishLiveUrl({
-  apiUrl,
-  token,
-  slug,
-  a2aUrl,
-  enabled,
-  gatewayStatus,
-}: {
-  apiUrl: string;
-  token: string;
-  slug: string;
-  a2aUrl: string | null;
-  enabled: boolean;
-  gatewayStatus: string;
-}): Promise<void> {
-  try {
-    const res = await fetch(`${apiUrl}/api/agents/${slug}/a2a`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+      artifact: {
+        artifactId: "response",
+        parts: [{ kind: "text", text: `Echo: ${userText}` }],
       },
-      body: JSON.stringify({ a2a_url: a2aUrl, a2a_enabled: enabled, gateway_status: gatewayStatus }),
-    });
-    if (!res.ok) {
-      console.warn(chalk.yellow(`⚠ Could not register URL with marketplace: ${res.status}`));
-    } else {
-      console.log(chalk.dim('  Registered with marketplace ✓'));
-    }
-  } catch (err) {
-    console.warn(chalk.yellow(`⚠ Could not register URL with marketplace: ${String(err)}`));
+    })
+
+    eventBus.publish({
+      kind: "status-update",
+      taskId,
+      contextId,
+      status: { state: "completed", timestamp: new Date().toISOString() },
+      final: true,
+    })
+    eventBus.finished()
   }
+
+  cancelTask = async (): Promise<void> => {}
 }
 
 // ---------------------------------------------------------------------------
 // Command
 // ---------------------------------------------------------------------------
 
-export const serveCommand = new Command('serve')
-  .description('Start a local A2A server for your agent')
-  .option('--port <port>', 'Port to listen on', '4000')
-  .option('--url <url>', 'Public URL (e.g. from ngrok) shown in logs and AgentCard')
-  .option('--openclaw-port <port>', 'OpenClaw gateway port', '18789')
-  .option('--openclaw-token <token>', 'OpenClaw gateway auth token (or set OPENCLAW_GATEWAY_TOKEN)')
-  .option('--openclaw-agent <id>', 'OpenClaw agent ID to target', 'main')
-  .option('--verbose', 'Enable verbose request/response logging')
+export const serveCommand = new Command("serve")
+  .description("Start a local A2A server for your agent")
+  .option("--port <port>", "Port to listen on", "4000")
+  .option("--url <url>", "Public URL (e.g. from ngrok) shown in logs and AgentCard")
+  .option("--client-id <id>", "Developer app client ID (or set WEB42_CLIENT_ID)")
+  .option("--client-secret <secret>", "Developer app client secret (or set WEB42_CLIENT_SECRET)")
+  .option("--verbose", "Enable verbose request/response logging")
   .action(
     async (opts: {
-      port: string;
-      url?: string;
-      openclawPort: string;
-      openclawToken?: string;
-      openclawAgent: string;
-      verbose?: boolean;
+      port: string
+      url?: string
+      clientId?: string
+      clientSecret?: string
+      verbose?: boolean
     }) => {
-      const verbose = opts.verbose ?? false;
+      const verbose = opts.verbose ?? false
 
-      // 1. Must be logged into web42
-      let token: string;
+      let token: string
       try {
-        const authConfig = requireAuth();
-        token = authConfig.token!;
+        const authConfig = requireAuth()
+        token = authConfig.token!
       } catch {
-        console.error(chalk.red('Not authenticated. Run `web42 auth login` first.'));
-        process.exit(1);
+        console.error(chalk.red("Not authenticated. Run `web42 auth login` first."))
+        process.exit(1)
       }
 
-      const cwd = process.cwd();
-      const port = parseInt(opts.port, 10);
-      const openClawPort = parseInt(opts.openclawPort, 10);
-      const openClawToken =
-        opts.openclawToken ?? process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
-      const openClawAgent = opts.openclawAgent;
-      const publicUrl = opts.url;
+      const clientId = opts.clientId ?? process.env.WEB42_CLIENT_ID
+      const clientSecret = opts.clientSecret ?? process.env.WEB42_CLIENT_SECRET
 
-      // 2. Read manifest.json
-      const manifestPath = join(cwd, 'manifest.json');
-      if (!existsSync(manifestPath)) {
-        console.error(chalk.red('No manifest.json found in current directory.'));
-        console.error(chalk.dim('Run `web42 init` to create one.'));
-        process.exit(1);
+      if (!clientId || !clientSecret) {
+        console.error(
+          chalk.red(
+            "Developer app credentials required.\n" +
+            "  Provide --client-id and --client-secret flags,\n" +
+            "  or set WEB42_CLIENT_ID and WEB42_CLIENT_SECRET env vars.\n" +
+            "  Create them at: https://web42.ai/settings/developer-apps"
+          )
+        )
+        process.exit(1)
       }
 
-      let manifest: Manifest;
-      try {
-        manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as Manifest;
-      } catch {
-        console.error(chalk.red('Failed to parse manifest.json.'));
-        process.exit(1);
+      const cwd = process.cwd()
+      const port = parseInt(opts.port, 10)
+      const publicUrl = opts.url
+      const config = getConfig()
+      const web42ApiUrl = config.apiUrl ?? "https://web42.ai"
+
+      // Read optional manifest.json for agent card metadata
+      const manifestPath = join(cwd, "manifest.json")
+      let agentName = "Local Agent"
+      let agentDescription = ""
+      let agentVersion = "1.0.0"
+      let skills: Array<{ id: string; name: string; description: string; tags: string[] }> = []
+
+      if (existsSync(manifestPath)) {
+        try {
+          const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"))
+          agentName = manifest.name ?? agentName
+          agentDescription = manifest.description ?? agentDescription
+          agentVersion = manifest.version ?? agentVersion
+          skills = (manifest.skills ?? []).map((s: { name: string; description?: string }) => ({
+            id: s.name.toLowerCase().replace(/\s+/g, "-"),
+            name: s.name,
+            description: s.description ?? "",
+            tags: [],
+          }))
+        } catch {
+          console.warn(chalk.yellow("Could not parse manifest.json, using defaults."))
+        }
       }
 
-      if (!manifest.name) {
-        console.error(chalk.red('manifest.json must have a "name" field.'));
-        process.exit(1);
-      }
+      const spinner = ora("Starting A2A server...").start()
 
-      const config = getConfig();
-      const web42ApiUrl = config.apiUrl ?? 'https://web42.ai';
-
-      const spinner = ora('Starting A2A server...').start();
-
-      // 3. Build AgentCard from manifest
       const agentCard: AgentCard = {
-        name: manifest.name,
-        description: manifest.description ?? '',
-        protocolVersion: '0.3.0',
-        version: manifest.version ?? '1.0.0',
+        name: agentName,
+        description: agentDescription,
+        protocolVersion: "0.3.0",
+        version: agentVersion,
         url: `${publicUrl ?? `http://localhost:${port}`}/a2a/jsonrpc`,
-        skills: (manifest.skills ?? []).map((s) => ({
-          id: s.name.toLowerCase().replace(/\s+/g, '-'),
-          name: s.name,
-          description: s.description ?? '',
-          tags: [],
-        })),
+        skills,
         capabilities: {
           streaming: true,
           pushNotifications: false,
         },
-        defaultInputModes: ['text'],
-        defaultOutputModes: ['text'],
+        defaultInputModes: ["text"],
+        defaultOutputModes: ["text"],
         securitySchemes: {
-          Web42Bearer: { type: 'http', scheme: 'bearer' },
+          Web42Bearer: { type: "http", scheme: "bearer" },
         },
         security: [{ Web42Bearer: [] }],
-      };
+      }
 
-      // 4. Start Express server
-      const app = express();
+      const app = express()
 
-      // Auth: validate caller's web42 Bearer token against marketplace introspect endpoint
-      const userBuilder = async (req: ExpressRequest): Promise<User> => {
-        const callerToken = req.headers.authorization?.split(' ')[1];
-        if (!callerToken) throw new Error('Missing token');
+      // Auth: validate caller's Bearer token via Web42 introspection with Basic auth
+      const basicAuth = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`
+
+      const userBuilder = async (req: express.Request): Promise<User> => {
+        const callerToken = req.headers.authorization?.split(" ")[1]
+        if (!callerToken) throw new Error("Missing token")
 
         if (verbose) {
-          const masked = `${callerToken.slice(0, 8)}...`;
-          console.log(chalk.gray(`[verbose] userBuilder: token=${masked} → introspecting...`));
+          console.log(chalk.gray(`[verbose] Introspecting token ${callerToken.slice(0, 8)}...`))
         }
 
         const res = await fetch(`${web42ApiUrl}/api/auth/introspect`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: callerToken }),
-        });
+          method: "POST",
+          headers: {
+            Authorization: basicAuth,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({ token: callerToken }),
+        })
 
-        if (!res.ok) throw new Error('Introspect call failed');
-        const result = (await res.json()) as { active: boolean; sub?: string; email?: string };
+        if (!res.ok) throw new Error("Introspect call failed")
+        const result = (await res.json()) as { active: boolean; sub?: string; email?: string }
 
         if (verbose) {
-          console.log(chalk.gray(`[verbose] userBuilder: token=${callerToken.slice(0, 8)}... → active=${result.active} sub=${result.sub ?? '(none)'}`));
+          console.log(chalk.gray(`[verbose] active=${result.active} sub=${result.sub ?? "(none)"}`))
         }
 
-        if (!result.active) throw new Error('Unauthorized');
+        if (!result.active) throw new Error("Unauthorized")
 
-        const userId = result.sub ?? '';
         return {
-          get isAuthenticated() { return true; },
-          get userName() { return userId; },
-        };
-      };
+          get isAuthenticated() { return true },
+          get userName() { return result.sub ?? "" },
+        }
+      }
 
-      const executor = new OpenClawAgentExecutor({ openClawPort, openClawToken, openClawAgent, verbose });
-      const requestHandler = new DefaultRequestHandler(agentCard, new InMemoryTaskStore(), executor);
+      const executor = new EchoExecutor()
+      const requestHandler = new DefaultRequestHandler(agentCard, new InMemoryTaskStore(), executor)
 
-      // 5. Mount A2A SDK handlers
       app.use(
-        '/.well-known/agent-card.json',
+        "/.well-known/agent-card.json",
         agentCardHandler({ agentCardProvider: requestHandler })
-      );
-      app.use('/a2a/jsonrpc', jsonRpcHandler({ requestHandler, userBuilder }));
+      )
+      app.use("/a2a/jsonrpc", jsonRpcHandler({ requestHandler, userBuilder }))
 
-      const a2aUrl = `${publicUrl ?? `http://localhost:${port}`}/a2a/jsonrpc`;
+      const a2aUrl = `${publicUrl ?? `http://localhost:${port}`}/a2a/jsonrpc`
 
-      // 6. Start listening
       app.listen(port, async () => {
-        spinner.stop();
-        console.log(chalk.green(`\n✓ Agent "${manifest.name}" is live`));
-        console.log(chalk.dim(`  Local:  http://localhost:${port}`));
-        if (publicUrl) console.log(chalk.dim(`  Public: ${publicUrl}`));
-        console.log(chalk.dim(`  Agent card: http://localhost:${port}/.well-known/agent-card.json`));
-        console.log(chalk.dim(`  JSON-RPC:   http://localhost:${port}/a2a/jsonrpc`));
+        spinner.stop()
+        console.log(chalk.green(`\n Agent "${agentName}" is live`))
+        console.log(chalk.dim(`  Local:      http://localhost:${port}`))
+        if (publicUrl) console.log(chalk.dim(`  Public:     ${publicUrl}`))
+        console.log(chalk.dim(`  Agent card: http://localhost:${port}/.well-known/agent-card.json`))
+        console.log(chalk.dim(`  JSON-RPC:   http://localhost:${port}/a2a/jsonrpc`))
 
-        if (verbose) {
-          console.log(chalk.gray(`[verbose] agent card url: http://localhost:${port}/.well-known/agent-card.json`));
-          console.log(chalk.gray(`[verbose] openclaw target: http://localhost:${openClawPort}/v1/chat/completions agent=${openClawAgent}`));
+        // Register live URL with marketplace
+        try {
+          await fetch(`${web42ApiUrl}/api/agents/${agentName}/a2a`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              a2a_url: a2aUrl,
+              a2a_enabled: true,
+              gateway_status: "live",
+            }),
+          })
+          console.log(chalk.dim("  Registered with marketplace"))
+        } catch {
+          console.warn(chalk.yellow("  Could not register with marketplace"))
         }
 
-        await publishLiveUrl({
-          apiUrl: web42ApiUrl,
-          token,
-          slug: manifest.name,
-          a2aUrl,
-          enabled: true,
-          gatewayStatus: 'live',
-        });
+        console.log(chalk.dim("\nWaiting for requests... (Ctrl+C to stop)\n"))
+      })
 
-        if (!publicUrl) {
-          console.log(chalk.yellow('  ⚠ No --url provided. Registered localhost URL is not publicly reachable; buyers cannot connect.'));
-        }
-
-        console.log(chalk.dim('\nWaiting for requests... (Ctrl+C to stop)\n'));
-      });
-
-      // 7. Keep process alive
-      process.on('SIGINT', async () => {
-        console.log(chalk.dim('\nShutting down...'));
-        await fetch(`${web42ApiUrl}/api/agents/${manifest.name}/a2a`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ a2a_url: null, a2a_enabled: false, gateway_status: 'offline' }),
-        }).catch(() => {}); // best-effort
-        process.exit(0);
-      });
+      process.on("SIGINT", async () => {
+        console.log(chalk.dim("\nShutting down..."))
+        await fetch(`${web42ApiUrl}/api/agents/${agentName}/a2a`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ a2a_url: null, a2a_enabled: false, gateway_status: "offline" }),
+        }).catch(() => {})
+        process.exit(0)
+      })
     }
-  );
+  )

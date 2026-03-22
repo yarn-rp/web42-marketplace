@@ -4,6 +4,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 
 import type { Agent, AgentVisibility } from "@/lib/types"
+import { getMarketplaceExtension } from "@/lib/agent-card-utils"
 import { AgentCard } from "@/components/agent-card"
 import { AgentVisibilityToggle } from "@/components/agent-visibility-toggle"
 import {
@@ -23,7 +24,10 @@ function filterByVisibility(
   filter: "all" | "public" | "private"
 ): Agent[] {
   if (filter === "all") return agents
-  return agents.filter((a) => a.visibility === filter)
+  return agents.filter(
+    (a) =>
+      (getMarketplaceExtension(a.agent_card)?.visibility ?? "public") === filter
+  )
 }
 
 export function ProfileAgentGrid({
@@ -92,7 +96,7 @@ export function ProfileAgentGrid({
               >
                 <AgentVisibilityToggle
                   agentId={agent.id}
-                  currentVisibility={(agent.visibility ?? "public") as AgentVisibility}
+                  currentVisibility={(getMarketplaceExtension(agent.agent_card)?.visibility ?? "public") as AgentVisibility}
                   profileUsername={profileUsername}
                 />
               </div>

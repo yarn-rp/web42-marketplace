@@ -5,10 +5,13 @@ import { cache } from "react"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/db/supabase/server"
 
-import type { Agent, AgentLicense, AgentResource, AgentVisibility } from "@/lib/types"
-import { isFreeLicense, isPaidLicense } from "@/lib/license-utils"
+import type { Agent, AgentResource } from "@/lib/types"
+import type { AgentCardJSON } from "@/lib/agent-card-utils"
+import { getMarketplaceExtension } from "@/lib/agent-card-utils"
 
-export type SortOption = "trending" | "stars" | "installs" | "recent"
+export type SortOption = "trending" | "stars" | "interactions" | "recent"
+
+const MARKETPLACE_EXT_URI = "https://web42.ai/ext/marketplace/v1"
 
 function flattenAgentRelations(row: Record<string, any>) {
   const { categories, tags, ...rest } = row
@@ -23,38 +26,29 @@ function flattenAgentRelations(row: Record<string, any>) {
   }
 }
 
-async function hydrateRemixSource(
-  db: Awaited<ReturnType<typeof createClient>>,
-  agents: Record<string, any>[]
-): Promise<void> {
-  const remixIds = agents
-    .map((a) => a.remixed_from_id)
-    .filter(Boolean) as string[]
-
-  if (remixIds.length === 0) return
-
-  const { data: originals } = await db
-    .from("agents")
-    .select("id, slug, name, owner:users!owner_id(username)")
-    .in("id", remixIds)
-
-  if (!originals) return
-
-  const originalsMap = new Map(originals.map((o: any) => [o.id, o]))
-
-  for (const agent of agents) {
-    if (agent.remixed_from_id) {
-      agent.remixed_from = originalsMap.get(agent.remixed_from_id) ?? null
-    }
+function setMarketplaceExtensionParam(
+  card: AgentCardJSON,
+  params: Record<string, unknown>
+): AgentCardJSON {
+  const updated = { ...card }
+  if (!updated.capabilities) updated.capabilities = {}
+  const exts = [...(updated.capabilities.extensions ?? [])]
+  const idx = exts.findIndex((e) => e.uri === MARKETPLACE_EXT_URI)
+  if (idx >= 0) {
+    exts[idx] = { ...exts[idx], params: { ...exts[idx].params, ...params } }
+  } else {
+    exts.push({ uri: MARKETPLACE_EXT_URI, params })
   }
+  updated.capabilities = { ...updated.capabilities, extensions: exts }
+  return updated
 }
 
 function getSortColumn(sort: SortOption) {
   switch (sort) {
     case "stars":
       return { column: "stars_count", ascending: false }
-    case "installs":
-      return { column: "installs_count", ascending: false }
+    case "interactions":
+      return { column: "interactions_count", ascending: false }
     case "recent":
       return { column: "created_at", ascending: false }
     case "trending":
@@ -76,9 +70,6 @@ export const getAgents = cache(
     category?: string,
     tag?: string,
     sort: SortOption = "trending",
-    platform?: string,
-    minPrice?: string,
-    maxPrice?: string,
     minStars?: string,
     publishedFrom?: string,
     creator?: string,
@@ -93,11 +84,6 @@ export const getAgents = cache(
         "*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)",
         selectOpts
       )
-      .eq("visibility", "public")
-
-    if (platform) {
-      query = query.eq("manifest->>platform", platform)
-    }
 
     if (search) {
       query = query.textSearch("search_vector", search, {
@@ -158,15 +144,6 @@ export const getAgents = cache(
       }
     }
 
-    if (minPrice) {
-      const min = parseInt(minPrice, 10)
-      if (!isNaN(min)) query = query.gte("price_cents", min)
-    }
-    if (maxPrice) {
-      const max = parseInt(maxPrice, 10)
-      if (!isNaN(max)) query = query.lte("price_cents", max)
-    }
-
     if (minStars) {
       const min = parseInt(minStars, 10)
       if (!isNaN(min)) query = query.gte("stars_count", min)
@@ -220,7 +197,6 @@ export const getFeaturedAgents = cache(async () => {
     .from("agents")
     .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .eq("featured", true)
-    .eq("visibility", "public")
     .order("stars_count", { ascending: false })
     .limit(6)
 
@@ -258,8 +234,6 @@ export const getAgentBySlug = cache(
       return null
     }
 
-    await hydrateRemixSource(db, [data])
-
     const {
       data: { user },
     } = await db.auth.getUser()
@@ -284,7 +258,6 @@ export const getAgentBySlug = cache(
 
     return {
       ...flattenAgentRelations(data),
-      remixed_from: data.remixed_from ?? null,
       has_starred: hasStarred,
       has_access: hasAccess,
     } as Agent
@@ -313,8 +286,6 @@ export const getAgentsByUser = cache(async (username: string) => {
     return []
   }
 
-  await hydrateRemixSource(db, data ?? [])
-
   return (data ?? []).map(flattenAgentRelations) as Agent[]
 })
 
@@ -336,8 +307,6 @@ export const getMyAgents = cache(async () => {
     console.error("Error fetching my agents:", error)
     return []
   }
-
-  await hydrateRemixSource(db, data ?? [])
 
   return (data ?? []).map(flattenAgentRelations) as Agent[]
 })
@@ -418,79 +387,6 @@ export async function unstarAgent(agentId: string) {
   return { success: true }
 }
 
-export async function remixAgent(agentId: string) {
-  const db = await createClient()
-  const {
-    data: { user },
-  } = await db.auth.getUser()
-
-  if (!user) return { error: "Not authenticated" }
-
-  const accessGranted = await hasAgentAccess(agentId)
-  if (!accessGranted) return { error: "Access required. Please get the agent first." }
-
-  const { data: original, error: fetchError } = await db
-    .from("agents")
-    .select("*")
-    .eq("id", agentId)
-    .single()
-
-  if (fetchError || !original) {
-    return { error: "Agent not found" }
-  }
-
-  const { data: remix, error: insertError } = await db
-    .from("agents")
-    .insert({
-      slug: original.slug,
-      name: original.name,
-      description: original.description,
-      readme: original.readme,
-      cover_image_url: original.cover_image_url,
-      demo_video_url: original.demo_video_url,
-      manifest: original.manifest,
-      owner_id: user.id,
-      remixed_from_id: agentId,
-      visibility: "private",
-    })
-    .select()
-    .single()
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      return { error: "You already have an agent with this slug" }
-    }
-    console.error("Error remixing agent:", insertError)
-    return { error: insertError.message }
-  }
-
-  const { data: originalFiles } = await db
-    .from("agent_files")
-    .select("path, content, content_hash, storage_url")
-    .eq("agent_id", agentId)
-
-  if (originalFiles && originalFiles.length > 0) {
-    const remixFiles = originalFiles.map((f: any) => ({
-      agent_id: remix.id,
-      path: f.path,
-      content: f.content,
-      content_hash: f.content_hash,
-      storage_url: f.storage_url,
-    }))
-    await db.from("agent_files").insert(remixFiles)
-  }
-
-  await db.rpc("increment_remix_count", { p_agent_id: agentId })
-  revalidatePath("/")
-
-  return { success: true, agent: remix }
-}
-
-export async function incrementInstallCount(agentId: string) {
-  const db = await createClient()
-  await db.rpc("increment_install_count", { p_agent_id: agentId })
-}
-
 // ============================================================
 // Agent access / entitlement
 // ============================================================
@@ -521,13 +417,16 @@ export async function acquireAgent(agentId: string) {
 
   const { data: agent } = await db
     .from("agents")
-    .select("price_cents")
+    .select("agent_card")
     .eq("id", agentId)
     .single()
 
   if (!agent) return { error: "Agent not found" }
 
-  if ((agent.price_cents ?? 0) > 0) {
+  const mktExt = getMarketplaceExtension(agent.agent_card as AgentCardJSON)
+  const priceCents = mktExt?.price_cents ?? 0
+
+  if (priceCents > 0) {
     return { error: "This is a paid agent. Please purchase through checkout." }
   }
 
@@ -572,50 +471,6 @@ export const getMyAgentBySlug = cache(async (slug: string) => {
   return data as Agent
 })
 
-export const getAgentFiles = cache(async (agentId: string) => {
-  const db = await createClient()
-  const { data, error } = await db
-    .from("agent_files")
-    .select("*")
-    .eq("agent_id", agentId)
-    .order("path", { ascending: true })
-
-  if (error) {
-    console.error("Error fetching agent files:", error)
-    return []
-  }
-
-  return data as import("@/lib/types").AgentFile[]
-})
-
-export async function toggleAgentVisibility(
-  agentId: string,
-  visibility: AgentVisibility,
-  profileUsername: string
-) {
-  const db = await createClient()
-  const {
-    data: { user },
-  } = await db.auth.getUser()
-
-  if (!user) return { error: "Not authenticated" }
-
-  const { error } = await db
-    .from("agents")
-    .update({ visibility })
-    .eq("id", agentId)
-    .eq("owner_id", user.id)
-
-  if (error) {
-    console.error("Error updating agent visibility:", error)
-    return { error: error.message }
-  }
-
-  revalidatePath(`/${profileUsername}`)
-  revalidatePath("/explore")
-  return { success: true }
-}
-
 export async function deleteAgent(
   agentId: string,
   profileUsername: string
@@ -626,16 +481,6 @@ export async function deleteAgent(
   } = await db.auth.getUser()
 
   if (!user) return { error: "Not authenticated" }
-
-  const { error: filesError } = await db
-    .from("agent_files")
-    .delete()
-    .eq("agent_id", agentId)
-
-  if (filesError) {
-    console.error("Error deleting agent files:", filesError)
-    return { error: filesError.message }
-  }
 
   const { error } = await db
     .from("agents")
@@ -684,9 +529,23 @@ export async function updateAgentPrice(
     }
   }
 
+  const { data: agent } = await db
+    .from("agents")
+    .select("agent_card")
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+    .single()
+
+  if (!agent) return { error: "Agent not found" }
+
+  const updatedCard = setMarketplaceExtensionParam(
+    (agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON,
+    { price_cents: priceCents }
+  )
+
   const { error } = await db
     .from("agents")
-    .update({ price_cents: priceCents })
+    .update({ agent_card: updatedCard })
     .eq("id", agentId)
     .eq("owner_id", user.id)
 
@@ -720,7 +579,7 @@ export async function getPublishValidation(
 
   const { data: agent } = await db
     .from("agents")
-    .select("readme, profile_image_url, license, price_cents")
+    .select("readme, profile_image_url, agent_card")
     .eq("id", agentId)
     .single()
 
@@ -734,14 +593,15 @@ export async function getPublishValidation(
     .select("agent_id", { count: "exact", head: true })
     .eq("agent_id", agentId)
 
+  const mktExt = getMarketplaceExtension(agent?.agent_card as AgentCardJSON)
   const rc = resourceCount ?? 0
-  const isFree = (agent?.price_cents ?? 0) === 0
+  const isFree = (mktExt?.price_cents ?? 0) === 0
 
   return {
     readme: !!agent?.readme && agent.readme.trim().length > 50,
     profileImage: isFree ? true : !!agent?.profile_image_url,
     resources: isFree ? true : rc >= 3,
-    license: !!agent?.license,
+    license: !!mktExt?.license,
     tags: (tagCount ?? 0) >= 1,
     resourceCount: rc,
     isFree,
@@ -765,30 +625,28 @@ export async function publishAgent(agentId: string, profileUsername: string) {
   if (!validation.license) errors.push("License must be selected")
   if (!validation.tags) errors.push("At least 1 tag is required")
 
-  const { data: agentData } = await db
-    .from("agents")
-    .select("price_cents, license")
-    .eq("id", agentId)
-    .single()
-
-  if (agentData?.license) {
-    const isFree = (agentData.price_cents ?? 0) === 0
-    if (isFree && isPaidLicense(agentData.license as AgentLicense)) {
-      errors.push("Free agents cannot use a commercial license (Proprietary/Custom)")
-    }
-    if (!isFree && isFreeLicense(agentData.license as AgentLicense)) {
-      errors.push("Paid agents cannot use an open-source license (MIT, Apache, GPL, BSD)")
-    }
-  }
-
   if (errors.length > 0) {
     return { error: errors.join(". "), validation }
   }
 
+  const { data: agent } = await db
+    .from("agents")
+    .select("agent_card")
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+    .single()
+
+  if (!agent) return { error: "Agent not found" }
+
+  const updatedCard = setMarketplaceExtensionParam(
+    (agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON,
+    { visibility: "public" }
+  )
+
   const { error } = await db
     .from("agents")
     .update({
-      visibility: "public" as AgentVisibility,
+      agent_card: updatedCard,
       published_at: new Date().toISOString(),
     })
     .eq("id", agentId)
@@ -813,9 +671,23 @@ export async function unpublishAgent(agentId: string, profileUsername: string) {
 
   if (!user) return { error: "Not authenticated" }
 
+  const { data: agent } = await db
+    .from("agents")
+    .select("agent_card")
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+    .single()
+
+  if (!agent) return { error: "Agent not found" }
+
+  const updatedCard = setMarketplaceExtensionParam(
+    (agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON,
+    { visibility: "private" }
+  )
+
   const { error } = await db
     .from("agents")
-    .update({ visibility: "private" as AgentVisibility })
+    .update({ agent_card: updatedCard })
     .eq("id", agentId)
     .eq("owner_id", user.id)
 
@@ -969,24 +841,39 @@ export async function updateAgentDetails(
 
   if (!user) return { error: "Not authenticated" }
 
-  const update: Record<string, string> = {}
   if (fields.name !== undefined) {
     const trimmed = fields.name.trim()
     if (!trimmed) return { error: "Name cannot be empty" }
     if (trimmed.length > 100) return { error: "Name must be 100 characters or fewer" }
-    update.name = trimmed
   }
   if (fields.description !== undefined) {
     if (fields.description.length > 500)
       return { error: "Description must be 500 characters or fewer" }
-    update.description = fields.description.trim()
   }
 
-  if (Object.keys(update).length === 0) return { error: "Nothing to update" }
+  if (fields.name === undefined && fields.description === undefined) {
+    return { error: "Nothing to update" }
+  }
+
+  const { data: agent } = await db
+    .from("agents")
+    .select("agent_card")
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+    .single()
+
+  if (!agent) return { error: "Agent not found" }
+
+  const updatedCard: AgentCardJSON = {
+    ...((agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON),
+  }
+  if (fields.name !== undefined) updatedCard.name = fields.name.trim()
+  if (fields.description !== undefined)
+    updatedCard.description = fields.description.trim()
 
   const { error } = await db
     .from("agents")
-    .update(update)
+    .update({ agent_card: updatedCard })
     .eq("id", agentId)
     .eq("owner_id", user.id)
 
@@ -1055,7 +942,7 @@ export async function updateAgentProfileImage(
 
 export async function updateAgentLicense(
   agentId: string,
-  license: AgentLicense | null,
+  license: string | null,
   profileUsername: string
 ) {
   const db = await createClient()
@@ -1065,14 +952,69 @@ export async function updateAgentLicense(
 
   if (!user) return { error: "Not authenticated" }
 
+  const { data: agent } = await db
+    .from("agents")
+    .select("agent_card")
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+    .single()
+
+  if (!agent) return { error: "Agent not found" }
+
+  const updatedCard = setMarketplaceExtensionParam(
+    (agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON,
+    { license: license ?? undefined }
+  )
+
   const { error } = await db
     .from("agents")
-    .update({ license })
+    .update({ agent_card: updatedCard })
     .eq("id", agentId)
     .eq("owner_id", user.id)
 
   if (error) {
     console.error("Error updating agent license:", error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/${profileUsername}`)
+  return { success: true }
+}
+
+export async function toggleAgentVisibility(
+  agentId: string,
+  visibility: "public" | "private" | "unlisted",
+  profileUsername: string
+) {
+  const db = await createClient()
+  const {
+    data: { user },
+  } = await db.auth.getUser()
+
+  if (!user) return { error: "Not authenticated" }
+
+  const { data: agent } = await db
+    .from("agents")
+    .select("agent_card")
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+    .single()
+
+  if (!agent) return { error: "Agent not found" }
+
+  const updatedCard = setMarketplaceExtensionParam(
+    (agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON,
+    { visibility }
+  )
+
+  const { error } = await db
+    .from("agents")
+    .update({ agent_card: updatedCard })
+    .eq("id", agentId)
+    .eq("owner_id", user.id)
+
+  if (error) {
+    console.error("Error updating agent visibility:", error)
     return { error: error.message }
   }
 

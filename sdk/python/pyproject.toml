@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "web42-auth"
+version = "0.1.0"
+description = "Web42 Auth SDK — token introspection client and framework middleware helpers"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = ["httpx>=0.24"]
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.100", "starlette>=0.27"]
+flask   = ["flask>=2.3"]
+a2a     = ["a2a-sdk>=0.2", "starlette>=0.27"]
+all     = ["fastapi>=0.100", "starlette>=0.27", "flask>=2.3", "a2a-sdk>=0.2"]
+
+[project.urls]
+Homepage = "https://github.com/web42-ai/web42-marketplace"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["web42_auth*"]
