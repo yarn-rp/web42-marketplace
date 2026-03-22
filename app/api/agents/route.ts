@@ -240,12 +240,28 @@ export async function POST(request: Request) {
     agentCard = { ...agentCard, capabilities: { ...caps, extensions } }
   }
 
+  const adminDb = getSupabaseAdmin()
+
+  // Fetch owner username for slug
+  const { data: ownerProfile } = await adminDb
+    .from("users")
+    .select("username")
+    .eq("id", auth.userId)
+    .single()
+
+  const ownerUsername = ownerProfile?.username
+  if (!ownerUsername) {
+    return NextResponse.json(
+      { error: "Could not resolve your username" },
+      { status: 400 }
+    )
+  }
+
   const cardName = agentCard.name ?? "Untitled"
-  const slug =
+  const agentSlugPart =
     explicitSlug ??
     cardName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
-
-  const adminDb = getSupabaseAdmin()
+  const slug = `@${ownerUsername}~${agentSlugPart}`
 
   // Try to find existing record by slug first (normal case)
   const { data: existingBySlug } = await adminDb
@@ -300,6 +316,7 @@ export async function POST(request: Request) {
       .insert({
         slug,
         owner_id: auth.userId,
+        published_at: new Date().toISOString(),
         ...agentFields,
       })
       .select("id")

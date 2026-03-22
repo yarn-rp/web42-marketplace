@@ -81,7 +81,7 @@ export const searchCommand = new Command("search")
           const name = getCardName(agent.agent_card)
           const description = getCardDescription(agent.agent_card)
           const priceCents = getMarketplacePrice(agent.agent_card)
-          const ref = `@${agent.owner.username}/${agent.slug}`
+          const ref = agent.slug.replace("~", "/")
           const stars =
             agent.stars_count > 0 ? chalk.yellow(` \u2605 ${agent.stars_count}`) : ""
           const price =

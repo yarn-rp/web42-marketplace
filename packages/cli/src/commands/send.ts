@@ -37,11 +37,15 @@ function getCachedToken(slug: string): CachedToken | null {
 
 export const sendCommand = new Command("send")
   .description("Send a message to an A2A agent")
-  .argument("<agent>", "Agent slug (e.g. my-agent) or direct URL (http://localhost:3001)")
+  .argument("<agent>", "Agent slug (e.g. @yan/richard) or direct URL (http://localhost:3001)")
   .argument("<message>", "Message to send")
   .option("--new", "Start a new conversation (clears saved context)")
   .option("--context <id>", "Use a specific context ID")
-  .action(async (agent: string, userMessage: string, opts: { new?: boolean; context?: string }) => {
+  .action(async (rawAgent: string, userMessage: string, opts: { new?: boolean; context?: string }) => {
+    // Normalize slug: @user/name → @user~name (DB format)
+    const agent = rawAgent.includes("/") && !isUrl(rawAgent)
+      ? rawAgent.replace("/", "~")
+      : rawAgent
     const config = requireAuth()
 
     let agentUrl: string
