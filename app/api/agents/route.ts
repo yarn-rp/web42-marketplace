@@ -59,19 +59,22 @@ export async function GET(request: Request) {
   if (username) {
     if (targetUser) {
       query = query.eq("owner_id", targetUser.id)
-      if (!isOwnerRequest) {
-        query = query.filter(
-          "agent_card->capabilities->extensions",
-          "cs",
-          JSON.stringify([
-            {
-              uri: "https://web42.ai/ext/marketplace/v1",
-              params: { visibility: "public" },
-            },
-          ])
-        )
-      }
     }
+  }
+
+  // For non-owner requests, always filter to public agents only.
+  // visibility lives in agent_card JSONB (not a column — dropped in migration 20260322010000).
+  if (!isOwnerRequest) {
+    query = query.filter(
+      "agent_card->capabilities->extensions",
+      "cs",
+      JSON.stringify([
+        {
+          uri: "https://web42.ai/ext/marketplace/v1",
+          params: { visibility: "public" },
+        },
+      ])
+    )
   }
 
   if (search) {
