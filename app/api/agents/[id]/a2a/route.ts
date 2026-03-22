@@ -49,9 +49,6 @@ export async function POST(
     return Response.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  // UPDATE must use admin client — RLS blocks UPDATE for CLI Bearer token requests
-  // (auth.uid() is null server-side; ownership already verified above)
-  const adminDb = getSupabaseAdmin()
   const { error } = await adminDb
     .from("agents")
     .update({
