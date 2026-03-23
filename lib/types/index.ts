@@ -1,11 +1,9 @@
 export type {
   Agent,
   AgentFile,
-  AgentLicense,
   AgentResource,
   AgentResourceType,
   AgentVisibility,
-  Category,
   Tag,
   Order,
   OrderStatus,

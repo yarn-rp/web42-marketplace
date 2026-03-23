@@ -15,7 +15,6 @@ import { AgentResultsSkeleton } from "@/components/agent-results-skeleton"
 import { AgentSearch } from "@/components/agent-search"
 import { ExploreFilters } from "@/components/explore-filters"
 import { SortSelect } from "@/components/sort-select"
-import { getCachedCategories } from "../actions/filters"
 import type { SortOption } from "../actions/agent"
 
 export const dynamic = "force-dynamic"
@@ -25,11 +24,8 @@ export default async function ExplorePage({
 }: {
   searchParams: {
     search?: string
-    category?: string
     tag?: string
     sort?: SortOption
-    minPrice?: string
-    maxPrice?: string
     minStars?: string
     publishedFrom?: string
     creator?: string
@@ -38,28 +34,21 @@ export default async function ExplorePage({
 }): Promise<ReactElement> {
   const {
     search,
-    category,
     tag,
     sort,
-    minPrice,
-    maxPrice,
     minStars,
     publishedFrom,
     creator,
     page,
   } = searchParams
-  const categories = await getCachedCategories()
 
   const hasFilter =
-    search || category || tag || minPrice || maxPrice || minStars || publishedFrom || creator
+    search || tag || minStars || publishedFrom || creator
 
   const suspenseKey = JSON.stringify({
     search,
-    category,
     tag,
     sort,
-    minPrice,
-    maxPrice,
     minStars,
     publishedFrom,
     creator,
@@ -73,10 +62,10 @@ export default async function ExplorePage({
           {hasFilter ? (
             <div className="mb-6">
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                {search ? "Search" : category ? "Category" : "Tag"}
+                {search ? "Search" : "Tag"}
               </p>
               <GradientHeading size="xxl">
-                {search ?? category ?? tag}
+                {search ?? tag}
               </GradientHeading>
             </div>
           ) : (
@@ -93,7 +82,7 @@ export default async function ExplorePage({
               <AgentSearch />
             </div>
             <div className="flex items-center gap-2">
-              <ExploreFilters categories={categories} />
+              <ExploreFilters />
               <SortSelect current={sort} />
             </div>
           </div>
@@ -105,11 +94,8 @@ export default async function ExplorePage({
           <Suspense key={suspenseKey} fallback={<AgentResultsSkeleton />}>
             <AgentResults
               search={search}
-              category={category}
               tag={tag}
               sort={sort}
-              minPrice={minPrice}
-              maxPrice={maxPrice}
               minStars={minStars}
               publishedFrom={publishedFrom}
               creator={creator}

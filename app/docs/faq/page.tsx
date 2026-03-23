@@ -116,8 +116,8 @@ export default function DocsFaqPage() {
                 manifest and scaffold your agent files, build and customize your
                 agent, then run <code className={code}>web42 push</code> to
                 upload it to the marketplace. Your agent starts as private —
-                configure it on the marketplace (readme, tags, pricing,
-                visibility) and publish when ready. See the{" "}
+                configure it on the marketplace (readme, tags, visibility) and
+                publish when ready. See the{" "}
                 <Link
                   href="/docs/publishing"
                   className="underline underline-offset-4 hover:text-foreground"
@@ -180,52 +180,6 @@ export default function DocsFaqPage() {
                 stored locally in{" "}
                 <code className={code}>.web42.config.json</code> and never
                 uploaded.
-              </p>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </section>
-
-      <section>
-        <h2 className="mb-4 text-xl font-semibold">Monetization</h2>
-        <Accordion type="single" collapsible>
-          <AccordionItem value="monetization-1">
-            <AccordionTrigger>How does pricing work?</AccordionTrigger>
-            <AccordionContent>
-              <p className="text-muted-foreground">
-                Agents can be free or paid. Paid agents have a minimum price of
-                $5 USD. Creators keep 90% of each sale — Web42 takes a 10%
-                platform fee. All payments are processed through Stripe. See the{" "}
-                <Link
-                  href="/docs/monetization"
-                  className="underline underline-offset-4 hover:text-foreground"
-                >
-                  Monetization docs
-                </Link>{" "}
-                for details.
-              </p>
-            </AccordionContent>
-          </AccordionItem>
-          <AccordionItem value="monetization-2">
-            <AccordionTrigger>How do I set up Stripe?</AccordionTrigger>
-            <AccordionContent>
-              <p className="text-muted-foreground">
-                Go to Settings &gt; Payouts on the Web42 marketplace and click
-                &ldquo;Connect with Stripe.&rdquo; This creates a Stripe Express
-                account. Complete Stripe&apos;s onboarding (identity
-                verification and bank details) to enable payouts. You must
-                finish onboarding before selling paid agents.
-              </p>
-            </AccordionContent>
-          </AccordionItem>
-          <AccordionItem value="monetization-3">
-            <AccordionTrigger>Can buyers get a refund?</AccordionTrigger>
-            <AccordionContent>
-              <p className="text-muted-foreground">
-                Yes, within 3 days (72 hours) of purchase. Buyers can request a
-                refund from their order history. On refund, Stripe processes the
-                return, the buyer&apos;s access to the agent is revoked, and the
-                order is marked as refunded. After 72 hours, sales are final.
               </p>
             </AccordionContent>
           </AccordionItem>

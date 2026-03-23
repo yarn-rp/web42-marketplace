@@ -15,7 +15,6 @@ interface CheckoutSuccessProps {
   username: string
   platform?: string
   currentUsername?: string
-  isFree?: boolean
   onClose?: () => void
 }
 
@@ -64,7 +63,6 @@ export function CheckoutSuccess({
   username,
   platform,
   currentUsername,
-  isFree = false,
   onClose,
 }: CheckoutSuccessProps) {
   const router = useRouter()
@@ -73,23 +71,14 @@ export function CheckoutSuccess({
 
   const installCommand = getInstallCommand(platform, username, agentSlug)
 
-  const terminalLines = isFree
-    ? [
-        `$ web42 get --agent @${username}/${agentSlug}`,
-        "> verifying account... done",
-        "> registering agent... done",
-        "> agent unlocked!",
-        "",
-        `✓ ${agentName} is now yours.`,
-      ]
-    : [
-        `$ web42 checkout --agent @${username}/${agentSlug}`,
-        "> verifying payment... done",
-        "> registering license... done",
-        "> agent unlocked!",
-        "",
-        `✓ ${agentName} is now yours.`,
-      ]
+  const terminalLines = [
+    `$ web42 get --agent @${username}/${agentSlug}`,
+    "> verifying account... done",
+    "> registering agent... done",
+    "> agent unlocked!",
+    "",
+    `✓ ${agentName} is now yours.`,
+  ]
 
   const { visibleLines, done } = useTypingSequence(terminalLines, open)
 
@@ -201,13 +190,6 @@ export function CheckoutSuccess({
                     </button>
                   </div>
                 </div>
-
-                {/* Creator note (paid only) */}
-                {!isFree && (
-                  <div className="text-xs italic text-zinc-400 dark:text-terminal-muted">
-                    Thanks for supporting @{username} ♥
-                  </div>
-                )}
 
                 <div className="h-px bg-zinc-200 dark:bg-terminal-border" />
 

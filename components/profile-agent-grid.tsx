@@ -85,7 +85,7 @@ export function ProfileAgentGrid({
             animate={{ opacity: 1, y: 0 }}
             className="relative"
           >
-            <AgentCard agent={agent} order={index} showPrice />
+            <AgentCard agent={agent} order={index} />
             {isOwner && (
               <div
                 className="absolute left-3 top-3 z-10"

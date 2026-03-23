@@ -20,7 +20,6 @@ import {
 
 import { useTheme } from "next-themes"
 
-import type { Category } from "@/lib/types"
 import { cn, truncateString } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -40,10 +39,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 export function NavSidebar({
-  categories,
   tags,
 }: {
-  categories?: Category[]
   tags?: string[]
 }) {
   const pathname = usePathname()
@@ -76,7 +73,6 @@ export function NavSidebar({
       >
         <nav className="flex flex-col items-center gap-4 px-2 py-5">
           <AgentNav
-            categories={categories}
             tags={tags}
             searchParams={searchParams}
           />
@@ -162,7 +158,6 @@ export function NavSidebar({
               <nav className="flex flex-col items-start gap-4 px-2 py-5">
                 <AgentNav
                   tags={tags}
-                  categories={categories}
                   handleLinkClick={handleLinkClick}
                   searchParams={searchParams}
                 >
@@ -279,7 +274,6 @@ export function NavSidebar({
 }
 
 type AgentNavProps = {
-  categories?: Category[]
   tags?: string[]
   handleLinkClick?: () => void
   searchParams: URLSearchParams
@@ -287,7 +281,6 @@ type AgentNavProps = {
 }
 
 function AgentNav({
-  categories,
   tags,
   searchParams,
   handleLinkClick,
@@ -298,37 +291,6 @@ function AgentNav({
       <LogoAnimationLink />
       {children}
       <ScrollArea className="h-[calc(100vh-320px)] md:h-[calc(100vh-200px)] flex flex-col gap-4 pl-2">
-        {categories && categories.length > 0 && (
-          <div className="flex items-center gap-2 mt-6 text-muted-foreground">
-            <BoxIcon className="size-5 stroke-emerald-400" />
-            <p className="text-sm md:hidden">Categories</p>
-          </div>
-        )}
-        <ul className="mt-2 w-36 flex flex-col gap-2 items-start justify-center py-2">
-          {categories?.map((category, index) => (
-            <li key={`category-${index}-${category.id}`}>
-              <Link
-                href={`/explore?category=${category.name}`}
-                onClick={handleLinkClick}
-                className={cn(
-                  "flex items-start space-x-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 rounded-md px-2 py-0.5",
-                  "shadow-[0_0_0_1px_rgba(0,0,0,0.1)_inset,0_0.5px_0.5px_rgba(0,0,0,0.05)_inset,0_-0.5px_0.5px_rgba(0,0,0,0.05)_inset,0_1px_2px_rgba(0,0,0,0.1)]",
-                  "dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.06)_inset,0_0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_-0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_1px_rgba(0,0,0,0.3),0_1px_2px_rgba(0,0,0,0.4)]",
-                  "dark:hover:shadow-[0_0_0_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_-0.5px_0.5px_rgba(255,255,255,0.1)_inset,0_0.5px_1px_rgba(0,0,0,0.4),0_1px_2px_rgba(0,0,0,0.5)]",
-                  searchParams.get("category") === category.name
-                    ? "bg-emerald-400 text-black dark:text-black"
-                    : ""
-                )}
-                prefetch={false}
-              >
-                <span className="px-1">
-                  {truncateString(category.name, 14)}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-
         {tags && tags.length > 0 && (
           <div className="flex items-center gap-2 mt-6 text-muted-foreground">
             <TagIcon className="size-5 stroke-pink-400" />

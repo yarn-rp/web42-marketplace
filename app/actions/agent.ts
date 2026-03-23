@@ -7,19 +7,15 @@ import { createClient } from "@/db/supabase/server"
 
 import type { Agent, AgentResource } from "@/lib/types"
 import type { AgentCardJSON } from "@/lib/agent-card-utils"
-import { getMarketplaceExtension } from "@/lib/agent-card-utils"
 
 export type SortOption = "trending" | "stars" | "interactions" | "recent"
 
 const MARKETPLACE_EXT_URI = "https://web42.ai/ext/marketplace/v1"
 
 function flattenAgentRelations(row: Record<string, any>) {
-  const { categories, tags, ...rest } = row
+  const { tags, ...rest } = row
   return {
     ...rest,
-    categories: categories
-      ?.map((r: any) => r.category)
-      .filter(Boolean) ?? [],
     tags: tags
       ?.map((r: any) => r.tag)
       .filter(Boolean) ?? [],
@@ -81,7 +77,7 @@ export const getAgents = cache(
     let query = db
       .from("agents")
       .select(
-        "*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)",
+        "*, owner:users!owner_id(id, full_name, avatar_url, username), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)",
         selectOpts
       )
 
@@ -90,32 +86,6 @@ export const getAgents = cache(
         type: "websearch",
         config: "english",
       })
-    }
-
-    if (category) {
-      const { data: cat } = await db
-        .from("categories")
-        .select("id")
-        .eq("name", category)
-        .maybeSingle()
-
-      if (cat) {
-        const { data: agentIds } = await db
-          .from("agent_categories")
-          .select("agent_id")
-          .eq("category_id", cat.id)
-
-        if (agentIds && agentIds.length > 0) {
-          query = query.in(
-            "id",
-            agentIds.map((row) => row.agent_id)
-          )
-        } else {
-          return { agents: [], totalCount: 0 }
-        }
-      } else {
-        return { agents: [], totalCount: 0 }
-      }
     }
 
     if (tag) {
@@ -195,7 +165,7 @@ export const getFeaturedAgents = cache(async () => {
   const db = await createClient()
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .eq("featured", true)
     .order("stars_count", { ascending: false })
     .limit(6)
@@ -223,7 +193,7 @@ export const getAgentBySlug = cache(
     const { data, error } = await db
       .from("agents")
       .select(
-        "*, owner:users!owner_id(id, full_name, avatar_url, username, bio, website, github_handle), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name))"
+        "*, owner:users!owner_id(id, full_name, avatar_url, username, bio, website, github_handle), tags:agent_tags(tag:tags(id, name))"
       )
       .eq("owner_id", owner.id)
       .eq("slug", `@${ownerUsername}~${agentSlug}`)
@@ -277,7 +247,7 @@ export const getAgentsByUser = cache(async (username: string) => {
 
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .eq("owner_id", owner.id)
     .order("stars_count", { ascending: false })
 
@@ -299,7 +269,7 @@ export const getMyAgents = cache(async () => {
 
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
 
@@ -330,7 +300,7 @@ export const getPurchasedAgents = cache(async () => {
 
   const { data, error } = await db
     .from("agents")
-    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
+    .select("*, owner:users!owner_id(id, full_name, avatar_url, username), tags:agent_tags(tag:tags(id, name)), resources:agent_resources(id, url, type, sort_order)")
     .in("id", agentIds)
     .neq("owner_id", user.id)
     .order("created_at", { ascending: false })
@@ -415,25 +385,9 @@ export async function acquireAgent(agentId: string) {
 
   if (!user) return { error: "Not authenticated" }
 
-  const { data: agent } = await db
-    .from("agents")
-    .select("agent_card")
-    .eq("id", agentId)
-    .single()
-
-  if (!agent) return { error: "Agent not found" }
-
-  const mktExt = getMarketplaceExtension(agent.agent_card as AgentCardJSON)
-  const priceCents = mktExt?.price_cents ?? 0
-
-  if (priceCents > 0) {
-    return { error: "This is a paid agent. Please purchase through checkout." }
-  }
-
   const { error } = await db.from("agent_access").insert({
     user_id: user.id,
     agent_id: agentId,
-    price_cents_at_acquisition: 0,
   })
 
   if (error) {
@@ -498,65 +452,6 @@ export async function deleteAgent(
   return { success: true }
 }
 
-export async function updateAgentPrice(
-  agentId: string,
-  priceCents: number,
-  profileUsername: string
-) {
-  const db = await createClient()
-  const {
-    data: { user },
-  } = await db.auth.getUser()
-
-  if (!user) return { error: "Not authenticated" }
-
-  if (priceCents !== 0 && priceCents < 500) {
-    return { error: "Minimum price is $5.00. Set to $0 for free." }
-  }
-
-  if (priceCents > 0) {
-    const { data: profile } = await db
-      .from("users")
-      .select("stripe_payouts_enabled")
-      .eq("id", user.id)
-      .single()
-
-    if (!profile?.stripe_payouts_enabled) {
-      return {
-        error:
-          "Connect a Stripe account in Settings before setting a paid price.",
-      }
-    }
-  }
-
-  const { data: agent } = await db
-    .from("agents")
-    .select("agent_card")
-    .eq("id", agentId)
-    .eq("owner_id", user.id)
-    .single()
-
-  if (!agent) return { error: "Agent not found" }
-
-  const updatedCard = setMarketplaceExtensionParam(
-    (agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON,
-    { price_cents: priceCents }
-  )
-
-  const { error } = await db
-    .from("agents")
-    .update({ agent_card: updatedCard })
-    .eq("id", agentId)
-    .eq("owner_id", user.id)
-
-  if (error) {
-    console.error("Error updating agent price:", error)
-    return { error: error.message }
-  }
-
-  revalidatePath(`/${profileUsername}`)
-  return { success: true }
-}
 
 // ============================================================
 // Publishing actions
@@ -566,7 +461,6 @@ export interface PublishValidation {
   readme: boolean
   profileImage: boolean
   resources: boolean
-  license: boolean
   tags: boolean
   resourceCount: number
   isFree: boolean
@@ -579,7 +473,7 @@ export async function getPublishValidation(
 
   const { data: agent } = await db
     .from("agents")
-    .select("readme, profile_image_url, agent_card")
+    .select("readme, profile_image_url")
     .eq("id", agentId)
     .single()
 
@@ -593,18 +487,15 @@ export async function getPublishValidation(
     .select("agent_id", { count: "exact", head: true })
     .eq("agent_id", agentId)
 
-  const mktExt = getMarketplaceExtension(agent?.agent_card as AgentCardJSON)
   const rc = resourceCount ?? 0
-  const isFree = (mktExt?.price_cents ?? 0) === 0
 
   return {
     readme: !!agent?.readme && agent.readme.trim().length > 50,
-    profileImage: isFree ? true : !!agent?.profile_image_url,
-    resources: isFree ? true : rc >= 3,
-    license: !!mktExt?.license,
+    profileImage: !!agent?.profile_image_url,
+    resources: rc >= 3,
     tags: (tagCount ?? 0) >= 1,
     resourceCount: rc,
-    isFree,
+    isFree: true,
   }
 }
 
@@ -620,9 +511,6 @@ export async function publishAgent(agentId: string, profileUsername: string) {
   const errors: string[] = []
 
   if (!validation.readme) errors.push("README must be at least 50 characters")
-  if (!validation.profileImage) errors.push("Profile image is required")
-  if (!validation.resources) errors.push(`At least 3 resources required (${validation.resourceCount}/3)`)
-  if (!validation.license) errors.push("License must be selected")
   if (!validation.tags) errors.push("At least 1 tag is required")
 
   if (errors.length > 0) {
@@ -933,47 +821,6 @@ export async function updateAgentProfileImage(
 
   if (error) {
     console.error("Error updating agent profile image:", error)
-    return { error: error.message }
-  }
-
-  revalidatePath(`/${profileUsername}`)
-  return { success: true }
-}
-
-export async function updateAgentLicense(
-  agentId: string,
-  license: string | null,
-  profileUsername: string
-) {
-  const db = await createClient()
-  const {
-    data: { user },
-  } = await db.auth.getUser()
-
-  if (!user) return { error: "Not authenticated" }
-
-  const { data: agent } = await db
-    .from("agents")
-    .select("agent_card")
-    .eq("id", agentId)
-    .eq("owner_id", user.id)
-    .single()
-
-  if (!agent) return { error: "Agent not found" }
-
-  const updatedCard = setMarketplaceExtensionParam(
-    (agent.agent_card ?? { name: "", description: "" }) as AgentCardJSON,
-    { license: license ?? undefined }
-  )
-
-  const { error } = await db
-    .from("agents")
-    .update({ agent_card: updatedCard })
-    .eq("id", agentId)
-    .eq("owner_id", user.id)
-
-  if (error) {
-    console.error("Error updating agent license:", error)
     return { error: error.message }
   }
 

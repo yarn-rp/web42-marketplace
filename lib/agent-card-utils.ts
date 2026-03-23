@@ -41,11 +41,7 @@ export interface AgentCardJSON {
 }
 
 export interface MarketplaceExtensionParams {
-  price_cents?: number
-  currency?: string
-  license?: string
   visibility?: string
-  categories?: string[]
   tags?: string[]
 }
 

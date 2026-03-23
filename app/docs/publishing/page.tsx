@@ -52,12 +52,6 @@ export default function DocsPublishingPage() {
             format (e.g., <code>1.0.0</code>)
           </li>
           <li>
-            <strong className="text-foreground">Primary category</strong> —
-            Customer Support, Healthcare, Developer Tools, Personal Assistant,
-            Sales, Marketing, Education, Finance, Content Creation, or
-            Productivity
-          </li>
-          <li>
             <strong className="text-foreground">Tags</strong> — comma-separated
           </li>
           <li>
@@ -332,26 +326,12 @@ web42 push     # pack is implicit — packs and uploads`}</pre>
             a profile image for your agent
           </li>
           <li>
-            <strong className="text-foreground">License</strong> — set a
-            license for your agent
-          </li>
-          <li>
             <strong className="text-foreground">Tags</strong> — add or remove
             tags for discoverability
           </li>
           <li>
             <strong className="text-foreground">Resources</strong> — attach
             demo videos, images, or documents (with sort order)
-          </li>
-          <li>
-            <strong className="text-foreground">Pricing</strong> — set your
-            agent as free or paid (minimum $5 for paid agents). See the{" "}
-            <Link
-              href="/docs/monetization"
-              className="text-foreground underline underline-offset-4"
-            >
-              monetization guide
-            </Link>
           </li>
           <li>
             <strong className="text-foreground">Visibility</strong> — toggle

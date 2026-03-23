@@ -19,12 +19,11 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Agent, AgentFile, AgentLicense, AgentResource, Tag } from "@/lib/types"
+import type { Agent, AgentFile, AgentResource, Tag } from "@/lib/types"
 import type { AgentSkillCard, AgentCardJSON } from "@/lib/agent-card-utils"
 import {
   getCardName,
   getCardDescription,
-  getMarketplaceExtension,
   getCardSkills,
 } from "@/lib/agent-card-utils"
 import { updateAgentReadme } from "@/app/actions/agent"
@@ -48,8 +47,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { AgentDeleteButton } from "./agent-delete-button"
 import { AgentDetailsEditor } from "./agent-details-editor"
-import { AgentLicenseSelect } from "./agent-license-select"
-import { AgentPriceEditor } from "./agent-price-editor"
 import { AgentProfileImage } from "./agent-profile-image"
 import { AgentResourceUpload } from "./agent-resource-upload"
 import { AgentTagManager } from "./agent-tag-manager"
@@ -492,8 +489,6 @@ function AgentDetailsTab({
   selectedTagIds: string[]
   profileUsername: string
 }) {
-  const mktExt = getMarketplaceExtension(agent.agent_card)
-
   return (
     <div className="space-y-6">
       <AgentDetailsEditor
@@ -502,26 +497,11 @@ function AgentDetailsTab({
         currentDescription={getCardDescription(agent.agent_card)}
         profileUsername={profileUsername}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <AgentProfileImage
-          agentId={agent.id}
-          currentImageUrl={agent.profile_image_url}
-          profileUsername={profileUsername}
-        />
-        <AgentLicenseSelect
-          agentId={agent.id}
-          currentLicense={(mktExt?.license as AgentLicense) ?? null}
-          priceCents={mktExt?.price_cents ?? 0}
-          profileUsername={profileUsername}
-        />
-        <AgentPriceEditor
-          agentId={agent.id}
-          currentPriceCents={mktExt?.price_cents ?? 0}
-          currentLicense={(mktExt?.license as AgentLicense) ?? null}
-          currency={mktExt?.currency ?? "usd"}
-          profileUsername={profileUsername}
-        />
-      </div>
+      <AgentProfileImage
+        agentId={agent.id}
+        currentImageUrl={agent.profile_image_url}
+        profileUsername={profileUsername}
+      />
       <AgentTagManager
         agentId={agent.id}
         allTags={allTags}
