@@ -7,11 +7,8 @@ import {
   Circle,
   FileText,
   Globe,
-  Image as ImageIcon,
   Loader2,
-  Scale,
   Tag,
-  Video,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -85,17 +82,8 @@ export function PublishChecklist({
 
   const mktExt = getMarketplaceExtension(agent.agent_card)
   const isPublished = (mktExt?.visibility ?? "public") === "public" && !!agent.published_at
-  const isFree = validation.isFree
 
-  const requiredChecks = isFree
-    ? [validation.readme, validation.license, validation.tags]
-    : [
-        validation.readme,
-        validation.profileImage,
-        validation.resources,
-        validation.license,
-        validation.tags,
-      ]
+  const requiredChecks = [validation.readme, validation.tags]
 
   const allPassed = requiredChecks.every(Boolean)
 
@@ -155,28 +143,6 @@ export function PublishChecklist({
           label="README"
           passed={validation.readme}
           detail={validation.readme ? undefined : "At least 50 characters"}
-        />
-        {!isFree && (
-          <ChecklistItem
-            icon={ImageIcon}
-            label="Profile image"
-            passed={validation.profileImage}
-            detail={validation.profileImage ? undefined : "1:1 square image"}
-          />
-        )}
-        {!isFree && (
-          <ChecklistItem
-            icon={Video}
-            label="Resources"
-            passed={validation.resources}
-            detail={`${validation.resourceCount}/3 minimum`}
-          />
-        )}
-        <ChecklistItem
-          icon={Scale}
-          label="License"
-          passed={validation.license}
-          detail={mktExt?.license ?? undefined}
         />
         <ChecklistItem
           icon={Tag}

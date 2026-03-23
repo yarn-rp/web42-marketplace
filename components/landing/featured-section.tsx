@@ -3,30 +3,18 @@
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 
-import type { Agent, Category } from "@/lib/types"
+import type { Agent } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { FadeIn, FadeInStagger } from "@/components/cult/fade-in"
-import { CategoryPill } from "@/components/category-pill"
+import { FadeIn } from "@/components/cult/fade-in"
 import { FeaturedCarousel } from "@/components/featured-carousel"
 
 interface FeaturedSectionProps {
   featured: Agent[]
-  categories: Category[]
 }
 
-export function FeaturedSection({ featured, categories }: FeaturedSectionProps) {
+export function FeaturedSection({ featured }: FeaturedSectionProps) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-      {categories.length > 0 && (
-        <FadeIn>
-          <div className="mb-8 flex flex-wrap items-center justify-center gap-2">
-            {categories.map((cat) => (
-              <CategoryPill key={cat.id} category={cat} />
-            ))}
-          </div>
-        </FadeIn>
-      )}
-
       {featured.length > 0 && (
         <FadeIn>
           <div className="mb-6 flex items-center justify-between">

@@ -340,9 +340,8 @@ auth-profiles.json     # Local auth credentials
         <ol className="list-decimal space-y-2 pl-6 text-muted-foreground">
           <li>
             <strong className="text-foreground">Access check</strong> — The CLI
-            verifies the user has access to the agent (owner, free acquisition,
-            or paid purchase). For paid agents the user must purchase on the
-            web first.
+            verifies the user has access to the agent (owner or free
+            acquisition).
           </li>
           <li>
             <strong className="text-foreground">Fetch files</strong> — Downloads
@@ -526,15 +525,6 @@ auth-profiles.json     # Local auth credentials
               CLI reference
             </Link>{" "}
             — all commands and flags
-          </li>
-          <li>
-            <Link
-              href="/docs/monetization"
-              className="text-foreground underline underline-offset-4"
-            >
-              Monetization
-            </Link>{" "}
-            — pricing, Stripe setup, and refunds
           </li>
         </ul>
       </section>

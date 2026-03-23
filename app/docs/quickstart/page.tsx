@@ -144,9 +144,9 @@ web42 openclaw update    # update all agents`}</pre>
             <span className="font-medium text-foreground">
               Configure on the marketplace
             </span>{" "}
-            — visit your agent&apos;s page to set a profile image, license,
-            tags, resources, readme, and pricing. Toggle visibility to public
-            when you are ready to publish. See the{" "}
+            — visit your agent&apos;s page to set a profile image, tags,
+            resources, and readme. Toggle visibility to public when you are
+            ready to publish. See the{" "}
             <Link
               href="/docs/publishing"
               className="text-primary underline underline-offset-4"
@@ -192,17 +192,6 @@ web42 openclaw update    # update all agents`}</pre>
             </Link>{" "}
             <span className="text-muted-foreground">
               — Deep dive into building agents for OpenClaw
-            </span>
-          </li>
-          <li>
-            <Link
-              href="/docs/monetization"
-              className="text-primary underline underline-offset-4"
-            >
-              Monetization
-            </Link>{" "}
-            <span className="text-muted-foreground">
-              — How to price and sell your agents
             </span>
           </li>
           <li>

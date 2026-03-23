@@ -27,7 +27,6 @@ export async function GET(request: Request) {
   const search = url.searchParams.get("search")
   const username = url.searchParams.get("username")
   const tags = url.searchParams.get("tags")           // comma-separated
-  const categories = url.searchParams.get("categories") // comma-separated
 
   const auth = await authenticateRequest(request).catch(() => null)
 
@@ -101,23 +100,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Category filtering: each category must be present in the marketplace extension params
-  if (categories) {
-    const catList = categories.split(",").map((c) => c.trim()).filter(Boolean)
-    for (const cat of catList) {
-      query = query.filter(
-        "agent_card->capabilities->extensions",
-        "cs",
-        JSON.stringify([
-          {
-            uri: "https://web42.ai/ext/marketplace/v1",
-            params: { categories: [cat] },
-          },
-        ])
-      )
-    }
-  }
-
   // "live" > "offline" alphabetically, so descending puts live agents first
   query = query
     .order("gateway_status", { ascending: false })
@@ -143,21 +125,13 @@ export async function POST(request: Request) {
   const {
     url: agentUrl,
     slug: explicitSlug,
-    price_cents,
-    currency,
-    license,
     visibility,
-    categories: bodyCategories,
     tags: bodyTags,
     profile_image_url,
   } = body as {
     url: string
     slug?: string
-    price_cents?: number
-    currency?: string
-    license?: string
     visibility?: string
-    categories?: string[]
     tags?: string[]
     profile_image_url?: string
   }
@@ -210,11 +184,7 @@ export async function POST(request: Request) {
 
   // Merge Web42 marketplace extension into capabilities.extensions[]
   const marketplaceParams: MarketplaceExtensionParams = {}
-  if (price_cents !== undefined) marketplaceParams.price_cents = price_cents
-  if (currency) marketplaceParams.currency = currency
-  if (license) marketplaceParams.license = license
   if (visibility) marketplaceParams.visibility = visibility
-  if (bodyCategories) marketplaceParams.categories = bodyCategories
   if (bodyTags) marketplaceParams.tags = bodyTags
 
   if (Object.keys(marketplaceParams).length > 0) {

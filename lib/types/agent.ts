@@ -3,14 +3,6 @@ import type { AgentCardJSON } from "@/lib/agent-card-utils"
 
 export type AgentVisibility = "public" | "private" | "unlisted"
 
-export type AgentLicense =
-  | "MIT"
-  | "Apache-2.0"
-  | "GPL-3.0"
-  | "BSD-3-Clause"
-  | "Proprietary"
-  | "Custom"
-
 export type AgentResourceType = "video" | "image" | "document"
 
 export interface AgentFile {
@@ -47,7 +39,6 @@ export interface Agent {
   updated_at: string
   gateway_status?: "live" | "offline" | null
   owner?: Profile
-  categories?: Category[]
   tags?: Tag[]
   resources?: AgentResource[]
   has_starred?: boolean
@@ -61,14 +52,6 @@ export interface Agent {
 export interface AgentAccess {
   user_id: string
   agent_id: string
-  price_cents_at_acquisition: number
-  created_at: string
-}
-
-export interface Category {
-  id: string
-  name: string
-  icon: string | null
   created_at: string
 }
 

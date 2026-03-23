@@ -1,4 +1,3 @@
-import { getCachedCategories } from "./actions/filters"
 import { getFeaturedAgents } from "./actions/agent"
 import { HeroSection } from "@/components/landing/hero-section"
 import { SupportedPlatforms } from "@/components/landing/supported-platforms"
@@ -8,7 +7,6 @@ import { FeaturedSection } from "@/components/landing/featured-section"
 
 async function Page() {
   const featured = await getFeaturedAgents()
-  const categories = await getCachedCategories()
 
   return (
     <div className="relative w-full">
@@ -21,7 +19,6 @@ async function Page() {
 
         <FeaturedSection
           featured={featured}
-          categories={categories}
         />
 
         <CreatorCTA />

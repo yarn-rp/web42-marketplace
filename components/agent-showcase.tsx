@@ -27,7 +27,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 
 import { AgentDetailTabs } from "./agent-detail-tabs"
-import { AgentPriceBadge } from "./agent-price-badge"
 import { CheckoutSuccess } from "./checkout-success"
 import { Button } from "@/components/ui/button"
 import { GetAgentButton } from "./get-agent-button"
@@ -91,15 +90,10 @@ export function AgentShowcase({
           username={username}
           platform={getCardProvider(agent.agent_card) ?? undefined}
           currentUsername={currentUsername}
-          isFree={freeAcquireSuccess}
-          onClose={
-            freeAcquireSuccess
-              ? () => {
-                  setFreeAcquireSuccess(false)
-                  router.refresh()
-                }
-              : undefined
-          }
+          onClose={() => {
+            setFreeAcquireSuccess(false)
+            router.refresh()
+          }}
         />
       )}
 
@@ -165,13 +159,9 @@ export function AgentShowcase({
             ) : (
               <GetAgentButton
                 agentId={agent.id}
-                priceCents={mktExt?.price_cents ?? 0}
+                priceCents={0}
                 isAuthenticated={isAuthenticated}
-                onSuccess={
-                  (mktExt?.price_cents ?? 0) === 0
-                    ? () => setFreeAcquireSuccess(true)
-                    : undefined
-                }
+                onSuccess={() => setFreeAcquireSuccess(true)}
               />
             )}
           </div>
@@ -301,14 +291,6 @@ export function AgentShowcase({
                 </span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Price</span>
-                <AgentPriceBadge
-                  priceCents={mktExt?.price_cents ?? 0}
-                  currency={mktExt?.currency ?? "usd"}
-                />
-              </div>
-
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CalendarIcon className="size-4" />
                 <span>
@@ -356,14 +338,6 @@ export function AgentShowcase({
                   </Badge>
                 </div>
               )}
-              {mktExt?.license && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">License</span>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {mktExt.license}
-                  </Badge>
-                </div>
-              )}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Visibility</span>
                 <Badge
@@ -377,26 +351,6 @@ export function AgentShowcase({
               </div>
             </CardContent>
           </Card>
-
-          {/* Categories */}
-          {agent.categories && agent.categories.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Categories</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-1.5">
-                  {agent.categories.map((cat) => (
-                    <Link key={cat.id} href={`/explore?category=${cat.name}`}>
-                      <Badge variant="outline" className="text-xs">
-                        {cat.name}
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Tags */}
           {agent.tags && agent.tags.length > 0 && (

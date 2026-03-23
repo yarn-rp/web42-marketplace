@@ -8,11 +8,8 @@ const DEFAULT_PAGE_SIZE = 24
 
 interface AgentResultsProps {
   search?: string
-  category?: string
   tag?: string
   sort?: SortOption
-  minPrice?: string
-  maxPrice?: string
   minStars?: string
   publishedFrom?: string
   creator?: string
@@ -21,11 +18,8 @@ interface AgentResultsProps {
 
 export async function AgentResults({
   search,
-  category,
   tag,
   sort,
-  minPrice,
-  maxPrice,
   minStars,
   publishedFrom,
   creator,
@@ -34,7 +28,7 @@ export async function AgentResults({
   const pageNum = Math.max(1, parseInt(page ?? "1", 10) || 1)
   const { agents, totalCount } = await getAgents(
     search,
-    category,
+    undefined,
     tag,
     sort,
     minStars,
@@ -46,10 +40,7 @@ export async function AgentResults({
 
   const hasFilter =
     search ||
-    category ||
     tag ||
-    minPrice ||
-    maxPrice ||
     minStars ||
     publishedFrom ||
     creator
@@ -58,11 +49,8 @@ export async function AgentResults({
 
   const searchParams = new URLSearchParams()
   if (search) searchParams.set("search", search)
-  if (category) searchParams.set("category", category)
   if (tag) searchParams.set("tag", tag)
   if (sort) searchParams.set("sort", sort)
-  if (minPrice) searchParams.set("minPrice", minPrice)
-  if (maxPrice) searchParams.set("maxPrice", maxPrice)
   if (minStars) searchParams.set("minStars", minStars)
   if (publishedFrom) searchParams.set("publishedFrom", publishedFrom)
   if (creator) searchParams.set("creator", creator)
@@ -87,7 +75,7 @@ export async function AgentResults({
     <div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {agents.map((agent, i) => (
-          <AgentCard key={agent.id} agent={agent} order={i} showPrice />
+          <AgentCard key={agent.id} agent={agent} order={i} />
         ))}
       </div>
       <ExplorePagination

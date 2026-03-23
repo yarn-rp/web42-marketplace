@@ -5,8 +5,7 @@ import { motion } from "framer-motion"
 import { Bot, Star } from "lucide-react"
 
 import type { Agent } from "@/lib/types"
-import { getCardName, getCardDescription, getMarketplaceExtension } from "@/lib/agent-card-utils"
-import { AgentPriceBadge } from "@/components/agent-price-badge"
+import { getCardName, getCardDescription } from "@/lib/agent-card-utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -22,11 +21,9 @@ const MAX_VISIBLE_TAGS = 3
 export function AgentCard({
   agent,
   order,
-  showPrice,
 }: {
   agent: Agent
   order: number
-  showPrice?: boolean
 }) {
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
@@ -37,7 +34,6 @@ export function AgentCard({
   const href = `/${username}/${agentSlugPart}`
   const name = getCardName(agent.agent_card)
   const description = getCardDescription(agent.agent_card)
-  const marketplace = getMarketplaceExtension(agent.agent_card)
   const sortedResources = [...(agent.resources ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order
   )
@@ -86,15 +82,6 @@ export function AgentCard({
                 ) : (
                   <Bot className="size-14 text-muted-foreground/40" />
                 )}
-              </div>
-            )}
-            {showPrice && (
-              <div className="absolute right-3 top-3">
-                <AgentPriceBadge
-                  priceCents={marketplace?.price_cents ?? 0}
-                  currency={marketplace?.currency ?? "usd"}
-                  className="text-xs"
-                />
               </div>
             )}
           </div>
@@ -163,20 +150,6 @@ export function AgentCard({
               <Star className="size-3" />
               {agent.stars_count}
             </span>
-            {marketplace?.license && (
-              <Badge variant="outline" className="ml-auto font-mono text-[10px]">
-                {marketplace.license}
-              </Badge>
-            )}
-            {!marketplace?.license && (marketplace?.price_cents ?? 0) > 0 && (
-              <div className="ml-auto">
-                <AgentPriceBadge
-                  priceCents={marketplace?.price_cents ?? 0}
-                  currency={marketplace?.currency ?? "usd"}
-                  className="text-[10px]"
-                />
-              </div>
-            )}
           </CardFooter>
         </Card>
       </Link>
