@@ -1,0 +1,23 @@
+name: Set npm latest tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to set as latest (e.g. 0.2.3)"
+        required: true
+
+jobs:
+  set-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set latest dist-tag
+        run: npm dist-tag add @web42/cli@${{ github.event.inputs.version }} latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
