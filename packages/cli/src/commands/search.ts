@@ -132,8 +132,8 @@ function formatSkills(skills: AgentSkillCard[] | undefined): string {
   if (!skills || skills.length === 0) {
     return ""
   }
-  const skillNames = skills.map((s) => s.name)
-  return `Skills: ${skillNames.join(", ")}`
+  const skillNames = skills.map((s) => `${s.name}`)
+  return `Skills: ${skillNames.join(" • ")}`
 }
 
 export const searchCommand = new Command("search")
