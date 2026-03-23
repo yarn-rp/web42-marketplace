@@ -4,9 +4,20 @@ import ora from "ora"
 
 import { apiGet } from "../utils/api.js"
 
+interface AgentSkillCard {
+  id: string
+  name: string
+  description: string
+  tags?: string[]
+  examples?: string[]
+  inputModes?: string[]
+  outputModes?: string[]
+}
+
 interface AgentCardJSON {
   name?: string
   description?: string
+  skills?: AgentSkillCard[]
   securitySchemes?: Record<string, { type: string; scheme?: string }>
   security?: Array<Record<string, unknown>>
   capabilities?: {
@@ -23,6 +34,7 @@ interface AgentResult {
   agent_card: AgentCardJSON
   stars_count: number
   interactions_count: number
+  gateway_status: string
   owner: {
     username: string
   }
@@ -36,13 +48,11 @@ function getCardDescription(card: AgentCardJSON | null | undefined): string {
   return card?.description ?? ""
 }
 
-function getSecurityLevel(card: AgentCardJSON | null | undefined): string {
-  const security = card?.security
-  if (!security || security.length === 0) return "🔓 Public"
-  const schemeName = Object.keys(security[0])[0]
-  if (!schemeName) return "🔓 Public"
-  if (schemeName === "Web42Bearer") return "🔐 Web42 Auth"
-  return `🔐 ${schemeName}`
+function getSecurityLevel(gatewayStatus: string): string {
+  if (gatewayStatus === "live") {
+    return "🔐 Web42 Auth"
+  }
+  return "⚠️  Offline"
 }
 
 function terminalLink(text: string, url: string): string {
@@ -87,11 +97,26 @@ function wrapText(text: string, maxWidth: number, maxLines: number): string[] {
 
 function printAsciiLogo(): void {
   const logo = chalk.bold.white(
-    `█ █  ███  ███  ███  ███ \n` +
-    `█ █ █   █ █    █    █   \n` +
-    `███ █   █ █ ██ █ ██  ██ \n` +
-    `█ █ █   █ █  █ █  █    █\n` +
-    `█ █  ███  ███  ███  ███ `
+    `████████  ████████████  ████████████████  ████████████████████████████████████████  ████████████████████████████████████████████████\n` +
+    ` ████████  ██████████████  ████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` ████████  ██████████████  ████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` ████████  ████████████████  ████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` ████████  ████████████████████  ████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` ████████  ██████████████████████  ████████████████████████████  ████████████████  ██████████\n` +
+    ` ████████  ████████████████████████████████████████████████████████████████████████████████████████████  ████████████████  ████████████████████████████████████████████████████\n` +
+    ` ████████  ████████████████████████████████████████████████████████████████████████████████████████████████████  ██████████████████████████████████████████████████████\n` +
+    ` ████████  ██████████████████████████████████████████████████████████████████████████████████████████████████  ███████████████████████████████████████████████████████████\n` +
+    ` ██████████████████████████████████████████████████████████████████████████████████████████████████████  ████████████████████████████████████████████████████████████████\n` +
+    ` ██████████████████████████  ████████████████████████████  ██████████████████████████████████████████  ████████████████  ██████████████████████████████████████████████████\n` +
+    ` ██████████████████████████  ████████████████████████████████████  ████████████████  ██████████\n` +
+    ` █████████████████████████  ██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` ████████████████████████  ██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` ███████████████████████  ██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` █████████████████████  ████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████\n` +
+    ` ███████████████████  ██████████  ███████████████████████████████████████████████████████████████████████  ████████████████████████████████████\n` +
+    ` ██████████████\n` +
+    ` ██████████████\n` +
+    ` ███████████`
   )
   console.log(logo)
   console.log()
@@ -101,6 +126,14 @@ function printGlobalHint(): void {
   const hint = `  Talk to any agent with  ${chalk.cyan(`npx web42 send <owner/agent> "your message"`)}`
   console.log(hint)
   console.log()
+}
+
+function formatSkills(skills: AgentSkillCard[] | undefined): string {
+  if (!skills || skills.length === 0) {
+    return ""
+  }
+  const skillNames = skills.map((s) => s.name)
+  return `Skills: ${skillNames.join(", ")}`
 }
 
 export const searchCommand = new Command("search")
@@ -136,8 +169,9 @@ export const searchCommand = new Command("search")
           const name = getCardName(agent.agent_card)
           const description = getCardDescription(agent.agent_card)
           const username = agent.owner.username
-          const security = getSecurityLevel(agent.agent_card)
+          const security = getSecurityLevel(agent.gateway_status)
           const stars = agent.stars_count > 0 ? `★ ${agent.stars_count}` : ""
+          const skills = formatSkills(agent.agent_card.skills)
 
           // Header: - <name (link)> | <@username (link)> | <security> | <stars>
           const nameLink = chalk.bold.cyan(
@@ -158,6 +192,11 @@ export const searchCommand = new Command("search")
             for (const line of wrapped) {
               console.log(`  ${line}`)
             }
+          }
+
+          // Skills
+          if (skills) {
+            console.log(`  ${skills}`)
           }
 
           // Send command
