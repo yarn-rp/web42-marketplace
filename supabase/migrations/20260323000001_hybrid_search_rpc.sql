@@ -29,7 +29,8 @@ RETURNS TABLE (
   created_at          timestamptz,
   updated_at          timestamptz,
   gateway_status      text,
-  embedding           vector(1536)
+  embedding           vector(1536),
+  hybrid_score        float8
 )
 LANGUAGE sql
 STABLE
