@@ -30,7 +30,11 @@ export function AgentCard({
 }) {
   const owner = agent.owner
   const username = owner?.username ?? "unknown"
-  const href = `/${username}/${agent.slug}`
+  // Slug is @user~agent-name — extract just the agent part for the URL
+  const agentSlugPart = agent.slug.includes("~")
+    ? agent.slug.split("~").pop()!
+    : agent.slug
+  const href = `/${username}/${agentSlugPart}`
   const name = getCardName(agent.agent_card)
   const description = getCardDescription(agent.agent_card)
   const marketplace = getMarketplaceExtension(agent.agent_card)

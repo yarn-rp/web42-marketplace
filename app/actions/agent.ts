@@ -226,7 +226,7 @@ export const getAgentBySlug = cache(
         "*, owner:users!owner_id(id, full_name, avatar_url, username, bio, website, github_handle), categories:agent_categories(category:categories(id, name, icon)), tags:agent_tags(tag:tags(id, name))"
       )
       .eq("owner_id", owner.id)
-      .eq("slug", agentSlug)
+      .eq("slug", `@${ownerUsername}~${agentSlug}`)
       .single()
 
     if (error) {
