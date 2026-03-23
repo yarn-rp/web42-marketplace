@@ -39,6 +39,7 @@ export const HARDCODED_EXCLUDES = [
   ".git/**",
   "node_modules/**",
   ".DS_Store",
+  "**/.DS_Store",
   "*.log",
   "openclaw.json",
   ".openclaw/credentials/**",
@@ -46,6 +47,16 @@ export const HARDCODED_EXCLUDES = [
   ".web42ignore",
   "manifest.json",
   "USER.md",
+  // Binary files — null bytes cause PostgreSQL to reject the payload
+  "**/*.png",
+  "**/*.jpg",
+  "**/*.jpeg",
+  "**/*.gif",
+  "**/*.webp",
+  "**/*.ico",
+  "**/*.mp4",
+  "**/*.webm",
+  "**/*.mov",
 ]
 
 const TEMPLATE_VARS: Array<[RegExp, string]> = [
