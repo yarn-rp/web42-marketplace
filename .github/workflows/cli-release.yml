@@ -49,7 +49,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.CLI_DIR }}
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Sync version and build binaries
         working-directory: ${{ env.CLI_DIR }}
@@ -94,7 +94,7 @@ jobs:
       - name: Install dependencies and build
         working-directory: ${{ env.CLI_DIR }}
         run: |
-          bun install --frozen-lockfile
+          bun install
           bash scripts/sync-version.sh
           bun run build
 
