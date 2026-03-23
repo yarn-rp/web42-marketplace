@@ -4,7 +4,8 @@
   "description": "CLI for the Web42 Agent Marketplace - push, install, and remix OpenClaw agent packages",
   "type": "module",
   "bin": {
-    "web42": "./dist/index.js"
+    "web42": "./dist/index.js",
+    "w42": "./dist/index.js"
   },
   "scripts": {
     "embed-skills": "bun scripts/embed-skills.ts",

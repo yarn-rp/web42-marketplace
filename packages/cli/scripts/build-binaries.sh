@@ -21,6 +21,14 @@ for entry in "${TARGETS[@]}"; do
   bun build --compile --target="$target" "$CLI_ROOT/src/index.ts" --outfile "$DIST_DIR/$outfile"
 done
 
+# Create w42-* aliases (same binary, shorter name)
+for entry in "${TARGETS[@]}"; do
+  outfile="${entry#*:}"
+  w42file="${outfile/web42/w42}"
+  echo "Creating alias $w42file -> $outfile"
+  cp "$DIST_DIR/$outfile" "$DIST_DIR/$w42file"
+done
+
 echo ""
 echo "All binaries built in $DIST_DIR:"
-ls -lh "$DIST_DIR"/web42-*
+ls -lh "$DIST_DIR"/web42-* "$DIST_DIR"/w42-*

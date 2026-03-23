@@ -109,6 +109,15 @@ install_binary() {
   fi
 
   info "Installed ${BINARY_NAME} to ${target_dir}/${BINARY_NAME}"
+
+  # Create w42 symlink for ergonomic short alias
+  local alias_name="w42"
+  if [ -w "$target_dir" ]; then
+    ln -sf "${BINARY_NAME}" "${target_dir}/${alias_name}"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo ln -sf "${BINARY_NAME}" "${target_dir}/${alias_name}"
+  fi
+  info "Created alias: ${alias_name} -> ${BINARY_NAME}"
 }
 
 main() {
@@ -137,6 +146,8 @@ main() {
   info "  ${BINARY_NAME} auth login    # authenticate with GitHub"
   info "  ${BINARY_NAME} search <q>    # find agents"
   info "  ${BINARY_NAME} --help        # see all commands"
+  info ""
+  info "Tip: 'w42' is a shortcut for '${BINARY_NAME}'"
 }
 
 main

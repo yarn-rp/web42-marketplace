@@ -58,7 +58,8 @@ jobs:
       - name: Generate checksums
         working-directory: ${{ env.CLI_DIR }}/dist
         run: |
-          sha256sum web42-linux-x64 web42-darwin-x64 web42-darwin-arm64 web42-windows-x64.exe > checksums.txt
+          sha256sum web42-linux-x64 web42-darwin-x64 web42-darwin-arm64 web42-windows-x64.exe \
+                    w42-linux-x64 w42-darwin-x64 w42-darwin-arm64 w42-windows-x64.exe > checksums.txt
           cat checksums.txt
 
       - name: Create GitHub Release
@@ -72,6 +73,10 @@ jobs:
             ${{ env.CLI_DIR }}/dist/web42-darwin-x64
             ${{ env.CLI_DIR }}/dist/web42-darwin-arm64
             ${{ env.CLI_DIR }}/dist/web42-windows-x64.exe
+            ${{ env.CLI_DIR }}/dist/w42-linux-x64
+            ${{ env.CLI_DIR }}/dist/w42-darwin-x64
+            ${{ env.CLI_DIR }}/dist/w42-darwin-arm64
+            ${{ env.CLI_DIR }}/dist/w42-windows-x64.exe
             ${{ env.CLI_DIR }}/dist/checksums.txt
 
   publish-npm:
@@ -101,6 +106,18 @@ jobs:
       - name: Publish to npm
         working-directory: ${{ env.CLI_DIR }}
         run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish wrapper (w42)
+        working-directory: packages/npx-w42
+        run: npm publish --access public || true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish wrapper (web42)
+        working-directory: packages/npx-web42
+        run: npm publish --access public || true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -169,6 +186,7 @@ jobs:
             def install
               binary_name = stable.url.split("/").last
               bin.install binary_name => "web42"
+              bin.install_symlink "web42" => "w42"
             end
 
             test do
@@ -234,7 +252,7 @@ jobs:
                 "hash": "${SHA}"
               }
             },
-            "bin": "web42.exe",
+            "bin": ["web42.exe", ["web42.exe", "w42"]],
             "checkver": {
               "github": "https://github.com/yarn-rp/web42-marketplace",
               "regex": "cli/v([\\\\d.]+)"

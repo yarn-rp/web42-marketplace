@@ -1,0 +1,14 @@
+{
+  "name": "w42",
+  "version": "1.0.0",
+  "description": "Run the Web42 CLI — shortcut for @web42/cli",
+  "type": "module",
+  "bin": {
+    "w42": "./bin/cli.js"
+  },
+  "dependencies": {
+    "@web42/cli": "*"
+  },
+  "keywords": ["web42", "w42", "cli", "ai-agents"],
+  "license": "MIT"
+}
