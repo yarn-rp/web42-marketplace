@@ -41,6 +41,7 @@
     ".next",
     "packages",
     "examples",
-    "sdk"
+    "sdk",
+    "supabase/functions"
   ]
 }
