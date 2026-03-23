@@ -3,6 +3,7 @@
 import { Command } from "commander"
 
 import { authCommand } from "./commands/auth.js"
+import { registerCommand } from "./commands/register.js"
 import { searchCommand } from "./commands/search.js"
 import { sendCommand } from "./commands/send.js"
 import { serveCommand } from "./commands/serve.js"
@@ -24,6 +25,7 @@ program
   })
 
 program.addCommand(authCommand)
+program.addCommand(registerCommand)
 program.addCommand(searchCommand)
 program.addCommand(sendCommand)
 program.addCommand(serveCommand)
