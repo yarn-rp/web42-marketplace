@@ -7,10 +7,6 @@ import { apiGet } from "../utils/api.js"
 interface AgentCardJSON {
   name?: string
   description?: string
-  provider?: {
-    organization?: string
-    url?: string
-  }
   securitySchemes?: Record<string, { type: string; scheme?: string }>
   security?: Array<Record<string, unknown>>
   capabilities?: {
@@ -40,37 +36,72 @@ function getCardDescription(card: AgentCardJSON | null | undefined): string {
   return card?.description ?? ""
 }
 
-function getMarketplacePrice(card: AgentCardJSON | null | undefined): number {
-  const ext = card?.capabilities?.extensions?.find(
-    (e) => e.uri === "https://web42.ai/ext/marketplace/v1"
-  )
-  return (ext?.params?.price_cents as number) ?? 0
-}
-
-function getProvider(card: AgentCardJSON | null | undefined): string | null {
-  const p = card?.provider
-  if (!p) return null
-  if (p.organization && p.url) return `${p.organization} (${p.url})`
-  return p.organization ?? p.url ?? null
-}
-
 function getSecurityLevel(card: AgentCardJSON | null | undefined): string {
   const security = card?.security
   if (!security || security.length === 0) return "🔓 Public"
-  const scheme = Object.keys(security[0])[0]
-  if (scheme === "Web42Bearer") return "🔐 Web42 Auth"
-  return `🔐 ${scheme}`
+  const schemeName = Object.keys(security[0])[0]
+  if (!schemeName) return "🔓 Public"
+  if (schemeName === "Web42Bearer") return "🔐 Web42 Auth"
+  return `🔐 ${schemeName}`
 }
 
-function getWebUrl(agent: AgentResult): string {
-  // slug format: @username~agent-name
-  const parts = agent.slug.replace("@", "").split("~")
-  return `https://web42.ai/${parts[0]}/${parts[1]}`
+function terminalLink(text: string, url: string): string {
+  return `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`
 }
 
-function truncate(str: string, max: number): string {
-  if (str.length <= max) return str
-  return str.slice(0, max - 1) + "\u2026"
+function wrapText(text: string, maxWidth: number, maxLines: number): string[] {
+  const lines: string[] = []
+  let currentLine = ""
+
+  const words = text.split(/\s+/)
+
+  for (const word of words) {
+    if (currentLine.length === 0) {
+      currentLine = word
+    } else if ((currentLine + " " + word).length <= maxWidth) {
+      currentLine += " " + word
+    } else {
+      lines.push(currentLine)
+      currentLine = word
+
+      if (lines.length >= maxLines) {
+        break
+      }
+    }
+  }
+
+  if (currentLine.length > 0) {
+    if (lines.length >= maxLines) {
+      if (lines[lines.length - 1].length + 1 + currentLine.length > maxWidth) {
+        lines[lines.length - 1] = lines[lines.length - 1].slice(0, maxWidth - 1) + "\u2026"
+      } else {
+        lines[lines.length - 1] += " " + currentLine
+      }
+    } else {
+      lines.push(currentLine)
+    }
+  }
+
+  return lines.slice(0, maxLines)
+}
+
+function printAsciiLogo(): void {
+  const logo = chalk.bold.white(
+    `██╗    ██╗███████╗██████╗ ██╗  ██╗██████╗ \n` +
+    `██║    ██║██╔════╝██╔══██╗██║  ██║╚════██╗\n` +
+    `██║ █╗ ██║█████╗  ██████╔╝███████║ █████╔╝\n` +
+    `██║███╗██║██╔══╝  ██╔══██╗╚════██║██╔═══╝ \n` +
+    `╚███╔███╔╝███████╗██████╔╝     ██║███████╗\n` +
+    ` ╚══╝╚══╝ ╚══════╝╚═════╝      ╚═╝╚══════╝`
+  )
+  console.log(logo)
+  console.log()
+}
+
+function printGlobalHint(): void {
+  const hint = `  Talk to any agent with  ${chalk.cyan(`npx web42 send <owner/agent> "your message"`)}`
+  console.log(hint)
+  console.log()
 }
 
 export const searchCommand = new Command("search")
@@ -99,47 +130,45 @@ export const searchCommand = new Command("search")
         const limit = parseInt(opts.limit, 10) || 10
         const results = agents.slice(0, limit)
 
-        console.log(
-          chalk.bold(`Found ${agents.length} agent(s) for "${query}":`)
-        )
-        console.log()
+        printAsciiLogo()
+        printGlobalHint()
 
         for (const agent of results) {
           const name = getCardName(agent.agent_card)
           const description = getCardDescription(agent.agent_card)
-          const priceCents = getMarketplacePrice(agent.agent_card)
-          const ref = agent.slug.replace("~", "/")
-          const provider = getProvider(agent.agent_card)
+          const username = agent.owner.username
           const security = getSecurityLevel(agent.agent_card)
-          const webUrl = getWebUrl(agent)
-          const stars =
-            agent.stars_count > 0 ? chalk.yellow(` \u2605 ${agent.stars_count}`) : ""
-          const price =
-            priceCents > 0
-              ? chalk.green(` $${(priceCents / 100).toFixed(2)}`)
-              : chalk.dim(" Free")
+          const stars = agent.stars_count > 0 ? `★ ${agent.stars_count}` : ""
 
-          console.log(`  ${chalk.cyan.bold(name)}${stars}${price}`)
-          console.log(`  ${chalk.dim(ref)}`)
-          if (description) {
-            console.log(`  ${truncate(description, 80)}`)
-          }
-          if (provider) {
-            console.log(`  ${chalk.dim("Provider:")} ${provider}`)
-          }
-          console.log(`  ${chalk.dim("Security:")} ${security}`)
-          console.log(`  ${chalk.dim("View:")}     ${webUrl}`)
-          console.log(
-            chalk.dim(`  Send: web42 send ${agent.slug} "hello"`)
+          // Header: - <name (link)> | <@username (link)> | <security> | <stars>
+          const nameLink = chalk.bold.cyan(
+            terminalLink(name, `https://web42.ai/${username}/${agent.slug.split("~")[1] ?? agent.slug}`)
           )
+          const usernameLink = chalk.dim(
+            terminalLink(`@${username}`, `https://web42.ai/${username}`)
+          )
+          const separator = chalk.dim(" | ")
+          const headerParts = [nameLink, usernameLink, security]
+          if (stars) headerParts.push(chalk.yellow(stars))
+
+          console.log(`- ${headerParts.join(separator)}`)
+
+          // Description (2 lines max, 72 chars wide)
+          if (description) {
+            const wrapped = wrapText(description, 72, 2)
+            for (const line of wrapped) {
+              console.log(`  ${line}`)
+            }
+          }
+
+          // Send command
+          console.log(`  ${chalk.dim("└")} ${chalk.cyan(`npx web42 send ${agent.slug} "hello"`)}`)
           console.log()
         }
 
         if (agents.length > limit) {
           console.log(
-            chalk.dim(
-              `  ... and ${agents.length - limit} more. Use --limit to see more.`
-            )
+            chalk.dim(`  ... and ${agents.length - limit} more. Use --limit to see more.`)
           )
         }
       } catch (error: unknown) {
