@@ -5,6 +5,35 @@ import { authenticateRequest } from "@/lib/auth/cli-auth"
 import type { AgentCardJSON, AgentExtension } from "@/lib/agent-card-utils"
 import type { MarketplaceExtensionParams } from "@/lib/agent-card-utils"
 
+async function generateQueryEmbedding(query: string): Promise<number[]> {
+  const openaiApiKey = process.env.OPENAI_API_KEY
+  if (!openaiApiKey) {
+    throw new Error("OPENAI_API_KEY is not configured")
+  }
+
+  const res = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: "text-embedding-3-small",
+      input: query,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = (await res.json()) as { error?: { message?: string } }
+    throw new Error(
+      `OpenAI embeddings API error ${res.status}: ${body.error?.message ?? "unknown"}`
+    )
+  }
+
+  const body = (await res.json()) as { data: Array<{ embedding: number[] }> }
+  return body.data[0].embedding
+}
+
 export const dynamic = "force-dynamic"
 
 interface AgentUpsertFields {
@@ -25,10 +54,40 @@ export async function GET(request: Request) {
   const db = await createClient()
   const url = new URL(request.url)
   const search = url.searchParams.get("search")
+  const mode = url.searchParams.get("mode")           // "hybrid" | "keyword" | absent
   const username = url.searchParams.get("username")
   const tags = url.searchParams.get("tags")           // comma-separated
   const categories = url.searchParams.get("categories") // comma-separated
 
+  // Hybrid search: search param present AND mode=hybrid
+  if (search && mode === "hybrid") {
+    let embedding: number[]
+    try {
+      embedding = await generateQueryEmbedding(search)
+    } catch (err) {
+      console.error("[api/agents GET] Failed to generate query embedding:", err)
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to generate embedding" },
+        { status: 502 }
+      )
+    }
+
+    const adminDb = getSupabaseAdmin()
+    const { data, error } = await adminDb.rpc("search_agents_hybrid", {
+      query_text: search,
+      query_embedding: JSON.stringify(embedding),
+      match_count: 20,
+    })
+
+    if (error) {
+      console.error("[api/agents GET] Hybrid search RPC error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
+  }
+
+  // Keyword search (default) and all other list queries
   const auth = await authenticateRequest(request).catch(() => null)
 
   let isOwnerRequest = false

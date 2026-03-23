@@ -24,7 +24,14 @@ export const manifestSchema = z.object({
     .regex(/^\d+\.\d+\.\d+$/, "Must follow semver (e.g. 1.0.0)"),
   author: z.string().min(1),
   skills: z
-    .array(z.object({ name: z.string(), description: z.string() }))
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        tags: z.array(z.string()).optional(),
+        examples: z.array(z.string()).optional(),
+      })
+    )
     .optional()
     .default([]),
   plugins: z.array(z.string()).optional().default([]),
