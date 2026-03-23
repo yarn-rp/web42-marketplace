@@ -7,6 +7,12 @@ import { apiGet } from "../utils/api.js"
 interface AgentCardJSON {
   name?: string
   description?: string
+  provider?: {
+    organization?: string
+    url?: string
+  }
+  securitySchemes?: Record<string, { type: string; scheme?: string }>
+  security?: Array<Record<string, unknown>>
   capabilities?: {
     extensions?: Array<{
       uri: string
@@ -39,6 +45,27 @@ function getMarketplacePrice(card: AgentCardJSON | null | undefined): number {
     (e) => e.uri === "https://web42.ai/ext/marketplace/v1"
   )
   return (ext?.params?.price_cents as number) ?? 0
+}
+
+function getProvider(card: AgentCardJSON | null | undefined): string | null {
+  const p = card?.provider
+  if (!p) return null
+  if (p.organization && p.url) return `${p.organization} (${p.url})`
+  return p.organization ?? p.url ?? null
+}
+
+function getSecurityLevel(card: AgentCardJSON | null | undefined): string {
+  const security = card?.security
+  if (!security || security.length === 0) return "🔓 Public"
+  const scheme = Object.keys(security[0])[0]
+  if (scheme === "Web42Bearer") return "🔐 Web42 Auth"
+  return `🔐 ${scheme}`
+}
+
+function getWebUrl(agent: AgentResult): string {
+  // slug format: @username~agent-name
+  const parts = agent.slug.replace("@", "").split("~")
+  return `https://web42.ai/${parts[0]}/${parts[1]}`
 }
 
 function truncate(str: string, max: number): string {
@@ -82,6 +109,9 @@ export const searchCommand = new Command("search")
           const description = getCardDescription(agent.agent_card)
           const priceCents = getMarketplacePrice(agent.agent_card)
           const ref = agent.slug.replace("~", "/")
+          const provider = getProvider(agent.agent_card)
+          const security = getSecurityLevel(agent.agent_card)
+          const webUrl = getWebUrl(agent)
           const stars =
             agent.stars_count > 0 ? chalk.yellow(` \u2605 ${agent.stars_count}`) : ""
           const price =
@@ -94,6 +124,11 @@ export const searchCommand = new Command("search")
           if (description) {
             console.log(`  ${truncate(description, 80)}`)
           }
+          if (provider) {
+            console.log(`  ${chalk.dim("Provider:")} ${provider}`)
+          }
+          console.log(`  ${chalk.dim("Security:")} ${security}`)
+          console.log(`  ${chalk.dim("View:")}     ${webUrl}`)
           console.log(
             chalk.dim(`  Send: web42 send ${agent.slug} "hello"`)
           )
