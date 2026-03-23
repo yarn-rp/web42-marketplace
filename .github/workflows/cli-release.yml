@@ -109,18 +109,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish wrapper (w42)
-        working-directory: packages/npx-w42
-        run: npm publish --access public || true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish wrapper (web42)
-        working-directory: packages/npx-web42
-        run: npm publish --access public || true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
   update-homebrew:
     needs: build-and-release
     runs-on: ubuntu-latest
