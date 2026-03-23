@@ -75,7 +75,7 @@ export async function GET(request: Request) {
     const adminDb = getSupabaseAdmin()
     const { data, error } = await adminDb.rpc("search_agents_hybrid", {
       query_text: search,
-      query_embedding: JSON.stringify(embedding),
+      query_embedding: embedding,
       match_count: 20,
     })
 
