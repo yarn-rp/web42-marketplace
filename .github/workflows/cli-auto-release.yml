@@ -78,8 +78,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.final.outputs.tag }}" -m "CLI v${{ steps.final.outputs.version }}"
-          git push origin "${{ steps.final.outputs.tag }}"
+          git tag -f "${{ steps.final.outputs.tag }}" -m "CLI v${{ steps.final.outputs.version }}"
+          git push origin "${{ steps.final.outputs.tag }}" --force
 
       - name: Trigger CLI Release workflow
         env:
